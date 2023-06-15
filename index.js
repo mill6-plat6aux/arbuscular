@@ -59,4 +59,5 @@ server.listen(setting.port);
 
 export * from "./body-parser.js";
 export * from "./errors.js";
+export * from "./files.js";
 export * from "./logger.js";

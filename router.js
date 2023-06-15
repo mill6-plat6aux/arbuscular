@@ -10,24 +10,31 @@
  * @typedef { import("http").ServerResponse } ServerResponse
  */
 
+/**
+ * @typedef {object} Schema
+ * @property {"string"|"number"|"boolean"|"object"|"array"} type
+ * @property {"date-time"|"date"|"time"|"email"|"uuid"} format
+ * @property {object} properties
+ * @property {Schema} items
+ */
+
 import FileSystem from "fs";
-import Path from "path"
+import Path from "path";
 import QueryString from "querystring";
 import YAML from "yaml";
 import { parse } from "./body-parser.js";
-import { ErrorCode } from "./errors.js";
+import { error, ErrorCode } from "./errors.js";
+import { DownloadFile } from "./files.js";
+import { LogLevel, writeError, writeLog } from "./logger.js";
 
 export class Router {
     constructor(setting) {
-        this.contextPath = "";
+        this.contextPath = setting.contextPath;
         this.spec;
         this.authPaths = [];
         this.authenticateFunction;
         this.authorizeFunction;
 
-        if(setting.contextPath != null) {
-            this.contextPath = setting.contextPath;
-        }
         if(setting.interface != null) {
             let interfaceDefinition = YAML.parse(FileSystem.readFileSync(setting.interface, "utf8"));
             this.spec = interfaceDefinition;
@@ -63,9 +70,8 @@ export class Router {
     /**
      * @param {IncomingMessage} request
      * @param {ServerResponse} response
-     * @param {object} setting
      */
-    async route(request, response, setting) {
+    async route(request, response) {
         if(request.method == null) {
             sendError(response, 404, "Not found.");
             return;
@@ -82,8 +88,11 @@ export class Router {
             return;
         }
 
+        writeLog(`${request.method} ${request.url}`, LogLevel.debug);
+
         let requestPath = request.url.substring(this.contextPath.length);
 
+        // retrieve query parameters
         let queryParameters;
         if(requestPath.includes("?")) {
             let index = requestPath.indexOf("?");
@@ -111,9 +120,10 @@ export class Router {
         // retrieve spec
         let spec = this.paths[requestPath];
 
-        // retrieve pathparameter
-        let parameters;
+        let pathParameter;
+        
         if(spec == null) {
+            // retrieve path parameter
             let index = requestPath.lastIndexOf("/");
             if(index == requestPath.length-1) {
                 sendError(response, 404, "Not found.");
@@ -124,32 +134,25 @@ export class Router {
             if(path != null) {
                 spec = this.paths[path];
             }
-            if(spec != null) {
-                let pathParameter = requestPath.substring(index+1);
-                if(spec.parameters != null && 
-                    spec.parameters.length == 1 && 
-                    spec.parameters[0].in == "path" &&
-                    spec.parameters[0].name != null &&
-                    spec.parameters[0].schema != null && 
-                    spec.parameters[0].schema.type != null) {
-                    let key = spec.parameters[0].name;
-                    let type = spec.parameters[0].schema.type;
-                    parameters = {};
-                    if(type == "number") {
-                        parameters[key] = Number(pathParameter);
-                    }else {
-                        parameters[key] = pathParameter;
-                    }
-                }
+            if(path != null && spec != null) {
+                pathParameter = requestPath.substring(index+1);
+                requestPath = path;
             }else {
+                writeLog(`Requested with a path parameter, but no corresponding REST API was found. ${request.method} ${request.url}`, LogLevel.info);
                 sendError(response, 404, "Not found.");
                 return;
             }
         }
 
         // retrieve method
-        spec = spec[request.method.toLowerCase()];
-        if(spec == null) {
+        let methodSpec = spec[request.method.toLowerCase()];
+        if(methodSpec != null) {
+            if(spec.parameters != null) {
+                methodSpec.parameters = spec.parameters;
+            }
+            spec = methodSpec;
+        }else {
+            writeLog(`No corresponding REST API was found. ${request.method} ${request.url}`, LogLevel.info);
             sendError(response, 404, "Not found.");
             return;
         }
@@ -160,33 +163,9 @@ export class Router {
             session = await this.authorizeFunction(request);
         }
 
-        let requestBody;
-        if(spec.requestBody != null && spec.requestBody.content != null) {
-            requestBody = await parse(request); 
-            let requestSpec;
-            if(requestContentType != null) {
-                requestSpec = spec.requestBody.content[requestContentType];
-            }else if(request.method == "GET") {
-                requestSpec = spec.requestBody.content["application/x-www-form-urlencoded"];
-            }
-            if(requestSpec != null && requestSpec.schema != null) {
-                if(!Router.validate(requestBody, requestSpec.schema, this.components)) {
-                    sendError(response, 400, "Request format is not supported.");
-                    return;
-                }
-            }
-        }else if(parameters != null) {
-            requestBody = parameters;
-        }
-
         // retrieve routing target
         let target;
-        if(parameters == null) {
-            let route = this.routeDefinition[requestPath];
-            if(route != null) {
-                target = route[request.method];
-            }
-        }else {
+        if(pathParameter != null) {
             let index = requestPath.lastIndexOf("/");
             if(index == requestPath.length-1) {
                 sendError(response, 404, "Not found.");
@@ -200,13 +179,73 @@ export class Router {
                     target = route[request.method];
                 }
             }
+        }else {
+            let route = this.routeDefinition[requestPath];
+            if(route != null) {
+                target = route[request.method];
+            }
         }
         if(target == null) {
+            writeLog(`No matching module was found. ${request.method} ${request.url}`, LogLevel.info);
             sendError(response, 404, "Not found.");
             return;
         }
 
-        // invoke
+        let requestBody;
+
+        // validate request
+        if(spec.requestBody != null && spec.requestBody.content != null) {
+            let parseSettings;
+            if(target != null && target.validTypes != null) {
+                parseSettings = {formData: target.validTypes};
+            }
+            requestBody = await parse(request, parseSettings);
+
+            let requestSpec;
+            if(requestContentType != null) {
+                requestSpec = spec.requestBody.content[requestContentType];
+            }
+            if(requestSpec != null && requestSpec.schema != null) {
+                if(!Router.validate(requestBody, requestSpec.schema, this.components)) {
+                    sendError(response, 400, "Request format is not supported.");
+                    return;
+                }
+            }
+        }else if(spec.parameters != null) {
+            if(queryParameters != null) {
+                requestBody = {};
+                let result = spec.parameters.every(parameterSpec => {
+                    if(parameterSpec.in != "query") {
+                        return false;
+                    }
+                    let key = parameterSpec.name;
+                    let type = parameterSpec.schema.type;
+                    if(type == "number") {
+                        requestBody[key] = Number(queryParameters[key]);
+                    }else {
+                        requestBody[key] = queryParameters[key];
+                    }
+                    return true;
+                });
+                if(!result) {
+                    sendError(response, 400, "Request format is not supported.");
+                    return;
+                }
+            }else if(pathParameter != null) {
+                if(spec.parameters.length == 1 && spec.parameters[0].in == "path") {
+                    let key = spec.parameters[0].name;
+                    let type = spec.parameters[0].schema.type;
+                    requestBody = {};
+                    if(type == "number") {
+                        requestBody[key] = Number(pathParameter);
+                    }else {
+                        requestBody[key] = pathParameter;
+                    }
+                }
+            }
+        }
+
+        // invoke module
         if(target.module == null) {
             sendError(response, 404, "Not found.");
             return;
@@ -221,17 +260,40 @@ export class Router {
             sendError(response, 404, "Not found.");
             return;
         }
-        let responseBody = await targetFunction.apply(null, [session, requestBody]);
+        let responseBody;
+        try {
+            responseBody = await targetFunction.apply(null, [session, requestBody]);
+        }catch(error) {
+            writeError(error.message+"\n"+error.stack);
+            sendError(response, error);
+            return;
+        }
 
+        // validate response
         if(spec.responses != null && spec.responses["200"] != null) {
-            if(spec.responses["200"].content != null) {
+            if(responseBody != null && spec.responses["200"].content != null) {
                 let responseSpec = spec.responses["200"].content;
-                Object.keys(responseSpec).forEach(contentType => {
-                    if(contentType == "application/json") {
-                        Router.validate(responseBody, responseSpec[contentType].schema, this.components);
+                if(typeof responseBody == "object") {
+                    if(responseBody instanceof DownloadFile) {
+                        if(responseSpec["application/pdf"] != null) {
+                            sendFile(response, responseBody.data, responseBody.dataType, responseBody.fileName);
+                        }else {
+                            sendError(response, 500, "Internal server error.");
+                            throw new Error("Unknown content type.");
+                        }
+                    }else {
+                        if(responseSpec["application/json"] != null) {
+                            if(!Router.validate(responseBody, responseSpec["application/json"].schema, this.components)) {
+                                sendError(response, 500, "Internal server error.");
+                                throw error(ErrorCode.StateError, "The data to be returned does not match the specification.");
+                            }
+                            sendJson(response, responseBody);
+                        }else {
+                            sendError(response, 500, "Internal server error.");
+                            throw new Error("Unknown content type.");
+                        }
                     }
-                    sendJson(response, responseBody);
-                });
+                }
             }else {
                 sendSuccess(response);
             }
@@ -241,6 +303,12 @@ export class Router {
         }
     }
 
+    /**
+     * @param {*} value 
+     * @param {Schema} spec 
+     * @param {object} components 
+     * @returns {boolean}
+     */
     static validate(value, spec, components) {
         if(spec.type == null && spec["$ref"] != null && components != null) {
             let references = spec["$ref"].split("/");
@@ -249,7 +317,9 @@ export class Router {
                 if(reference == "#" || reference == "components") return;
                 component = component == null ? components[reference] : component[reference];
             });
-            spec = component;
+            if(component != null) {
+                spec = component;
+            }
         }
         if(spec.type == "string") {
             if(typeof value != "string") {
@@ -276,9 +346,11 @@ export class Router {
             if(typeof value != "object") {
                 return false;
             }
-            Object.keys(spec.properties).forEach(propertyName => {
-                Router.validate(value[propertyName], spec.properties[propertyName]);
-            });
+            if(spec.properties != null) {
+                Object.keys(spec.properties).forEach(propertyName => {
+                    Router.validate(value[propertyName], spec.properties[propertyName], components);
+                });
+            }
         }else if(spec.type == "array") {
             if(!Array.isArray(value)) {
                 return false;
@@ -303,6 +375,20 @@ function sendJson(response, data) {
     });
     response.write(JSON.stringify(data));
     response.end();
+}
+
+/**
+ * @param {ServerResponse} response 
+ * @param {Buffer} data 
+ * @param {string} dataType 
+ * @param {string} fileName 
+ */
+function sendFile(response, data, dataType, fileName) {
+    response.writeHead(200, {
+        "Access-Control-Allow-Origin": "*",
+        "Content-Type": dataType
+    });
+    response.end(data);
 }
 
 /**

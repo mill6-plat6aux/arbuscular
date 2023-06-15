@@ -13,11 +13,7 @@
 import { URL } from "url";
 import querystring from "querystring";
 import Busboy from "busboy";
-
-/**
- * @type {BodyParserSetting}
- */
-export let settings;
+import { UploadFile } from "./files.js";
 
 /**
  * @typedef {object} FormDataSetting
@@ -31,9 +27,10 @@ export let settings;
 
 /**
  * @param {IncomingMessage} request
+ * @param {BodyParserSetting} [settings]
  * @returns {Promise<object>}
  */
-export async function parse(request) {
+export async function parse(request, settings) {
     let contentType = request.headers["content-type"];
     let charset = "utf-8";
     if(contentType != null) {
@@ -59,7 +56,7 @@ export async function parse(request) {
         }
     }else if(contentType == "multipart/form-data") {
         try {
-            parseFormData(request);
+            body = await parseFormData(request, settings);
         }catch(error) {
             throw new Error("The file format you specify is not supported.");
         }
@@ -137,10 +134,11 @@ async function parseJson(charset, request) {
 
 /**
  * @param {IncomingMessage} request 
+ * @param {BodyParserSetting} [settings]
  */
-function parseFormData(request) {
+function parseFormData(request, settings) {
     return new Promise((resolve, reject) => {
-        let formDataTypes = settings.formData.validTypes;
+        let formDataTypes = (settings != null && settings.formData != null) ? settings.formData.validTypes : null;
         var busboy = Busboy({headers: request.headers});
         let fields = {};
         busboy.on("file", (fieldname, file, info) => {
@@ -161,7 +159,7 @@ function parseFormData(request) {
                 }
             });
             file.on("end", () => {
-                fields[fieldname] = {data: buffer, type: info.mimeType};
+                fields[fieldname] = new UploadFile(buffer, info.mimeType, info.filename);
             });
         });
         busboy.on("field", function(fieldname, val, fieldnameTruncated, valTruncated, encoding, mimetype) {

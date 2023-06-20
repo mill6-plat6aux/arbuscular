@@ -4,7 +4,7 @@ The frivolous API front-end 😂
 
 ## Setup
 
-Create `didinium.yaml` at the top level of your Node.js project and write the following.
+Create `arbuscular.yaml` at the top level of your Node.js project and write the following.
 
 ```yaml
 port: 3000
@@ -40,8 +40,8 @@ interfaces:
     function: addUser
 ```
 
-Finally, `npm install didinium` in your Node.js project and `npx didinium` will start the API server on the specified port.
+Finally, `npm install arbuscular` in your Node.js project and `npx arbuscular` will start the API server on the specified port.
 
 ## License
 
-[MIT](https://github.com/mill6-plat6aux/didinium/blob/main/LICENSE)
+[MIT](https://github.com/mill6-plat6aux/arbuscular/blob/main/LICENSE)

@@ -18,7 +18,7 @@ import Http from "http";
 import { Router } from "./router.js";
 import { writeError } from "./logger.js";
 
-let settingFile = readFileSync("didinium.yaml", "utf8");
+let settingFile = readFileSync("arbuscular.yaml", "utf8");
 let setting = YAML.parse(settingFile);
 
 let interfaces = setting.interfaces.map(interfaceSpec => {
@@ -53,7 +53,7 @@ const server = Http.createServer((request, response) => {
     }
 });
 server.on("listening", () => {
-    console.log(`Didinium is listening on ${setting.port}.`);
+    console.log(`Arbuscular is listening on ${setting.port}.`);
 });
 server.listen(setting.port);
 

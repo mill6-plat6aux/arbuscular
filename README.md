@@ -1,4 +1,4 @@
-# didinium
+# Arbuscular
 
 The frivolous API front-end 😂
 

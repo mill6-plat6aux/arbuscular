@@ -112,8 +112,14 @@ export class Router {
         // retrieve auth spec
         let authSpec = this.authPaths.find(authPath => requestPath == authPath.url);
         if(authSpec != null && this.authenticateFunction != null) {
-            let result = await this.authenticateFunction(request);
-            sendJson(response, result);
+            // authentication
+            try {
+                let result = await this.authenticateFunction(request);
+                sendJson(response, result);
+            }catch(error) {
+                writeError(error.message+"\n"+error.stack);
+                sendError(response, error);
+            }
             return;
         }
 
@@ -160,7 +166,13 @@ export class Router {
         // authorization
         let session;
         if(spec.security != null && this.authorizeFunction != null) {
-            session = await this.authorizeFunction(request);
+            try {
+                session = await this.authorizeFunction(request);
+            }catch(error) {
+                writeError(error.message+"\n"+error.stack);
+                sendError(response, error);
+                return;
+            }
         }
 
         // retrieve routing target

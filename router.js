@@ -57,11 +57,13 @@ export class Router {
         }
         if(setting.authentication != null && setting.authentication.module != null && setting.authentication.function != null) {
             import(Path.resolve(setting.authentication.module)).then(module => {
+                /** @type {import("./spi.js").authenticate} */
                 this.authenticateFunction = module[setting.authentication.function];
             });
         }
         if(setting.authorization != null && setting.authorization.module != null && setting.authorization.function != null) {
             import(Path.resolve(setting.authorization.module)).then(module => {
+                /** @type {import("./spi.js").authorize} */
                 this.authorizeFunction = module[setting.authorization.function];
             });
         }
@@ -267,6 +269,7 @@ export class Router {
             sendError(response, 404, "Not found.");
             return;
         }
+        /** @type {import("./spi.js").handle} */
         let targetFunction = module[target.function];
         if(targetFunction == null) {
             sendError(response, 404, "Not found.");

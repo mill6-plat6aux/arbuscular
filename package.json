@@ -1,11 +1,12 @@
 {
   "name": "arbuscular",
-  "version": "0.9.4",
+  "version": "0.9.5",
   "description": "The frivolous API front-end 😂",
   "keywords": [
-    "Front-end",
-    "Server",
-    "Framework"
+    "REST",
+    "API",
+    "OpenAPI",
+    "Server"
   ],
   "author": "Takuro Okada",
   "repository": "mill6-plat6aux/arbuscular",

@@ -29,28 +29,36 @@ if(setting.port == undefined) {
     setting.port = 3000;
 }
 
+if(setting.acccessControl == undefined) {
+    setting.acccessControl = {
+        allowOrigin: "*"
+    };
+}else if(setting.acccessControl.allowOrigin == undefined) {
+    setting.acccessControl.allowOrigin = "*";
+}
+
 const server = Http.createServer((request, response) => {
     let interfaceSpec = interfaces.find(interfaceSpec => request.url?.startsWith(interfaceSpec.contextPath));
     if(interfaceSpec == null) {
         response.writeHead(404, {
-            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Origin": setting.acccessControl.allowOrigin,
             "Content-Type": "text/plain"
         });
         response.write("Not found.");
         response.end();
         return;
     }
-    try {
-        interfaceSpec.router.route(request, response);
-    }catch(error) {
+    /** @type {Router} */
+    let router = interfaceSpec.router;
+    router.route(request, response).catch(error => {
         writeError(error.message+"\n"+error.stack);
         response.writeHead(500, {
-            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Origin": setting.acccessControl.allowOrigin,
             "Content-Type": "text/plain"
         });
         response.write("An error has occurred on the server. Please contact the administrator.");
         response.end();
-    }
+    });
 });
 server.on("listening", () => {
     console.log(`Arbuscular is listening on ${setting.port}.`);

@@ -11,11 +11,35 @@
  */
 
 /**
+ * @typedef {object} Module
+ * @property {string} module Module file path
+ * @property {string} function The function implemented in module
+ */
+
+/**
+ * @typedef {object} AccessControl
+ * @property {string} allowOrigin * or origin
+ * @property {string} allowHeaders * or HTTP headers
+ * @property {string} allowMethods * or HTTP methods
+ */
+
+/**
+ * @typedef {object} RouterSetting
+ * @property {string} contextPath
+ * @property {string} interface Interface definition file (Open API ver3)
+ * @property {string} route The path of the file that defines the relationship between the request path and the module
+ * @property {Module} authentication
+ * @property {Module} authorization 
+ * @property {AccessControl} acccessControl
+ */
+
+/**
  * @typedef {object} Schema
  * @property {"string"|"number"|"boolean"|"object"|"array"} type
- * @property {"date-time"|"date"|"time"|"email"|"uuid"} format
+ * @property {"date-time"|"date"|"time"|"byte"|"email"|"uuid"} format
  * @property {object} properties
  * @property {Schema} items
+ * @property {Array<string>} enum
  */
 
 import FileSystem from "fs";
@@ -28,12 +52,26 @@ import { DownloadFile } from "./files.js";
 import { LogLevel, writeError, writeLog } from "./logger.js";
 
 export class Router {
+    /**
+     * @param {RouterSetting} setting 
+     */
     constructor(setting) {
         this.contextPath = setting.contextPath;
         this.spec;
         this.authPaths = [];
         this.authenticateFunction;
         this.authorizeFunction;
+
+        if(setting.acccessControl == undefined) {
+            setting.acccessControl = {
+                allowOrigin: "*",
+                allowHeaders: "*",
+                allowMethods: "*",
+            };
+        }else if(setting.acccessControl.allowOrigin == undefined) {
+            setting.acccessControl.allowOrigin = "*";
+        }
+        this.acccessControl = setting.acccessControl;
 
         if(setting.interface != null) {
             let interfaceDefinition = YAML.parse(FileSystem.readFileSync(setting.interface, "utf8"));
@@ -75,18 +113,18 @@ export class Router {
      */
     async route(request, response) {
         if(request.method == null) {
-            sendError(response, 404, "Not found.");
+            this.sendError(response, 404, "Not found.");
             return;
         }
 
-        // Preflight
+        // preflight
         if(request.method == "OPTIONS") {
-            sendSuccess(response);
+            this.sendSuccess(response);
             return;
         }
 
         if(request.url == null) {
-            sendError(response, 404, "Not found.");
+            this.sendError(response, 404, "Not found.");
             return;
         }
 
@@ -99,7 +137,7 @@ export class Router {
         if(requestPath.includes("?")) {
             let index = requestPath.indexOf("?");
             if(index == requestPath.length-1) {
-                sendError(response, 404, "Not found.");
+                this.sendError(response, 404, "Not found.");
                 return;
             }
             queryParameters = QueryString.parse(requestPath.substring(index+1));
@@ -117,10 +155,10 @@ export class Router {
             // authentication
             try {
                 let result = await this.authenticateFunction(request);
-                sendJson(response, result);
+                this.sendJson(response, result);
             }catch(error) {
                 writeError(error.message+"\n"+error.stack);
-                sendError(response, error);
+                this.sendError(response, error);
             }
             return;
         }
@@ -134,7 +172,7 @@ export class Router {
             // retrieve path parameter
             let index = requestPath.lastIndexOf("/");
             if(index == requestPath.length-1) {
-                sendError(response, 404, "Not found.");
+                this.sendError(response, 404, "Not found.");
                 return;
             }
             let _requestPath = requestPath.substring(0, index+1);
@@ -147,7 +185,7 @@ export class Router {
                 requestPath = path;
             }else {
                 writeLog(`Requested with a path parameter, but no corresponding REST API was found. ${request.method} ${request.url}`, LogLevel.info);
-                sendError(response, 404, "Not found.");
+                this.sendError(response, 404, "Not found.");
                 return;
             }
         }
@@ -161,7 +199,7 @@ export class Router {
             spec = methodSpec;
         }else {
             writeLog(`No corresponding REST API was found. ${request.method} ${request.url}`, LogLevel.info);
-            sendError(response, 404, "Not found.");
+            this.sendError(response, 404, "Not found.");
             return;
         }
 
@@ -172,7 +210,7 @@ export class Router {
                 session = await this.authorizeFunction(request);
             }catch(error) {
                 writeError(error.message+"\n"+error.stack);
-                sendError(response, error);
+                this.sendError(response, error);
                 return;
             }
         }
@@ -182,7 +220,7 @@ export class Router {
         if(pathParameter != null) {
             let index = requestPath.lastIndexOf("/");
             if(index == requestPath.length-1) {
-                sendError(response, 404, "Not found.");
+                this.sendError(response, 404, "Not found.");
                 return;
             }
             let _requestPath = requestPath.substring(0, index+1);
@@ -201,7 +239,7 @@ export class Router {
         }
         if(target == null) {
             writeLog(`No matching module was found. ${request.method} ${request.url}`, LogLevel.info);
-            sendError(response, 404, "Not found.");
+            this.sendError(response, 404, "Not found.");
             return;
         }
 
@@ -221,7 +259,8 @@ export class Router {
             }
             if(requestSpec != null && requestSpec.schema != null) {
                 if(!Router.validate(requestBody, requestSpec.schema, this.components)) {
-                    sendError(response, 400, "Request format is not supported.");
+                    writeError(`The request differs from the interface definition.:\n${JSON.stringify(requestBody, null, 4)}\nDefinition:\n${JSON.stringify(requestSpec.schema, null, 4)}`, LogLevel.error);
+                    this.sendError(response, 400, "Request format is not supported.");
                     return;
                 }
             }
@@ -242,7 +281,7 @@ export class Router {
                     return true;
                 });
                 if(!result) {
-                    sendError(response, 400, "Request format is not supported.");
+                    this.sendError(response, 400, "Request format is not supported.");
                     return;
                 }
             }else if(pathParameter != null) {
@@ -261,18 +300,18 @@ export class Router {
 
         // invoke module
         if(target.module == null) {
-            sendError(response, 404, "Not found.");
+            this.sendError(response, 404, "Not found.");
             return;
         }
         let module = await import(Path.resolve(target.module));
         if(module == null || target.function == null) {
-            sendError(response, 404, "Not found.");
+            this.sendError(response, 404, "Not found.");
             return;
         }
         /** @type {import("./spi.js").handle} */
         let targetFunction = module[target.function];
         if(targetFunction == null) {
-            sendError(response, 404, "Not found.");
+            this.sendError(response, 404, "Not found.");
             return;
         }
         let responseBody;
@@ -280,7 +319,7 @@ export class Router {
             responseBody = await targetFunction.apply(null, [session, requestBody]);
         }catch(error) {
             writeError(error.message+"\n"+error.stack);
-            sendError(response, error);
+            this.sendError(response, error);
             return;
         }
 
@@ -291,30 +330,27 @@ export class Router {
                 if(typeof responseBody == "object") {
                     if(responseBody instanceof DownloadFile) {
                         if(responseSpec["application/pdf"] != null) {
-                            sendFile(response, responseBody.data, responseBody.dataType, responseBody.fileName);
+                            this.sendFile(response, responseBody.data, responseBody.dataType, responseBody.fileName);
                         }else {
-                            sendError(response, 500, "Internal server error.");
-                            throw new Error("Unknown content type.");
+                            this.sendError(response, 500, "Internal server error.");
                         }
                     }else {
                         if(responseSpec["application/json"] != null) {
                             if(!Router.validate(responseBody, responseSpec["application/json"].schema, this.components)) {
-                                sendError(response, 500, "Internal server error.");
-                                throw error(ErrorCode.StateError, "The data to be returned does not match the specification.");
+                                this.sendError(response, 500, "Internal server error.");
+                                writeError(`The response differs from the interface definition.\n${JSON.stringify(responseBody, null, 4)}\nDefinition:\n${JSON.stringify(responseSpec["application/json"].schema, null, 4)}`);
                             }
-                            sendJson(response, responseBody);
+                            this.sendJson(response, responseBody);
                         }else {
-                            sendError(response, 500, "Internal server error.");
-                            throw new Error("Unknown content type.");
+                            this.sendError(response, 500, "Internal server error.");
                         }
                     }
                 }
             }else {
-                sendSuccess(response);
+                this.sendSuccess(response);
             }
         }else {
-            sendError(response, 500, "Internal server error.");
-            throw new Error("Response spec is not found in the interface definition.");
+            this.sendError(response, 500, "Internal server error.");
         }
     }
 
@@ -344,8 +380,21 @@ export class Router {
                 if(!/^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$/.test(value)) {
                     return false;
                 }
+            }else if(spec.format == "date") {
+                if(!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(value)) {
+                    return false;
+                }
+            }else if(spec.format == "byte") {
+                if(!/^[a-zA-Z0-9+/=]+$/.test(value)) {
+                    return false;
+                }
             }else if(spec.format == "uuid") {
                 if(!/^[0-9A-F]{8}-[0-9A-F]{4}-[1-4]{1}[0-9A-F]{3}-[0-9A-F]{4}-[0-9A-F]{12}$/.test(value)) {
+                    return false;
+                }
+            }
+            if(spec.enum != null) {
+                if(!spec.enum.includes(value)) {
                     return false;
                 }
             }
@@ -362,8 +411,8 @@ export class Router {
                 return false;
             }
             if(spec.properties != null) {
-                Object.keys(spec.properties).forEach(propertyName => {
-                    Router.validate(value[propertyName], spec.properties[propertyName], components);
+                return Object.keys(spec.properties).every(propertyName => {
+                    return Router.validate(value[propertyName], spec.properties[propertyName], components);
                 });
             }
         }else if(spec.type == "array") {
@@ -371,92 +420,104 @@ export class Router {
                 return false;
             }
             let elementSpec = spec.items;
-            value.forEach(childValue => {
-                Router.validate(childValue, elementSpec, components);
+            return value.every(childValue => {
+                return Router.validate(childValue, elementSpec, components);
+            });
+        }else if(spec.type == "null") {
+            if(value != null) {
+                return false;
+            }
+        }else if(Array.isArray(spec.type)) {
+            /** @type {Array} */
+            let specs = spec.type;
+            return specs.some(type => {
+                let _spec = Object.assign({}, spec);
+                _spec.type = type;
+                return Router.validate(value, _spec, components);
             });
         }
         return true;
     }
-}
 
-/**
- * @param {ServerResponse} response 
- * @param {object} data 
- */
-function sendJson(response, data) {
-    response.writeHead(200, {
-        "Access-Control-Allow-Origin": "*",
-        "Content-Type": "application/json"
-    });
-    response.write(JSON.stringify(data));
-    response.end();
-}
-
-/**
- * @param {ServerResponse} response 
- * @param {Buffer} data 
- * @param {string} dataType 
- * @param {string} fileName 
- */
-function sendFile(response, data, dataType, fileName) {
-    response.writeHead(200, {
-        "Access-Control-Allow-Origin": "*",
-        "Content-Type": dataType
-    });
-    response.end(data);
-}
-
-/**
- * @param {ServerResponse} response 
- */
-function sendSuccess(response) {
-    response.writeHead(200, {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Headers": "*",
-        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE"
-    });
-    response.end();
-}
-
-/**
- * @param {ServerResponse} response 
- * @param {number|Error} statusCode 
- * @param {string} [message] 
- */
-function sendError(response, statusCode, message) {
-    if(typeof statusCode == "object" && statusCode instanceof Error) {
-        let error = statusCode;
-        if(error.name == ErrorCode.AuthenticationError) {
-            statusCode = 401;
-            message = error.message;
-        }else if(error.name == ErrorCode.AuthorizationError) {
-            statusCode = 403;
-            message = error.message;
-        }else if(error.name == ErrorCode.JwtParseError) {
-            statusCode = 400;
-            message = error.message;
-        }else if(error.name == ErrorCode.RequestError) {
-            statusCode = 400;
-            message = error.message;
-        }else if(error.name == ErrorCode.StateError) {
-            statusCode = 403;
-            message = error.message;
-        }else if(error.name == ErrorCode.NotFoundError) {
-            statusCode = 404;
-            message = error.message;
-        }else {
-            statusCode = 500;
-            message = "An error has occurred on the server. Please contact the administrator.";
-        }
-    }
-    if(typeof statusCode == "number") {
-        response.writeHead(statusCode, {
-            "Access-Control-Allow-Origin": "*",
-            "Content-Type": "text/plain"
+    /**
+     * @param {ServerResponse} response 
+     * @param {object} data 
+     */
+    sendJson(response, data) {
+        response.writeHead(200, {
+            "Access-Control-Allow-Origin": this.acccessControl.allowOrigin,
+            "Content-Type": "application/json"
         });
+        response.write(JSON.stringify(data));
+        response.end();
     }
-    if(message != null) {
-        response.write(message);
+    
+    /**
+     * @param {ServerResponse} response 
+     * @param {Buffer} data 
+     * @param {string} dataType 
+     * @param {string} fileName 
+     */
+    sendFile(response, data, dataType, fileName) {
+        response.writeHead(200, {
+            "Access-Control-Allow-Origin": this.acccessControl.allowOrigin,
+            "Content-Type": dataType
+        });
+        response.end(data);
     }
-    response.end();
+    
+    /**
+     * @param {ServerResponse} response 
+     */
+    sendSuccess(response) {
+        response.writeHead(200, {
+            "Access-Control-Allow-Origin": this.acccessControl.allowOrigin,
+            "Access-Control-Allow-Headers": this.acccessControl.allowHeaders,
+            "Access-Control-Allow-Methods": this.acccessControl.allowMethods
+        });
+        response.end();
+    }
+    
+    /**
+     * @param {ServerResponse} response 
+     * @param {number|Error} statusCode 
+     * @param {string} [message] 
+     */
+    sendError(response, statusCode, message) {
+        if(typeof statusCode == "object" && statusCode instanceof Error) {
+            let error = statusCode;
+            if(error.name == ErrorCode.AuthenticationError) {
+                statusCode = 401;
+                message = error.message;
+            }else if(error.name == ErrorCode.AuthorizationError) {
+                statusCode = 403;
+                message = error.message;
+            }else if(error.name == ErrorCode.JwtParseError) {
+                statusCode = 400;
+                message = error.message;
+            }else if(error.name == ErrorCode.RequestError) {
+                statusCode = 400;
+                message = error.message;
+            }else if(error.name == ErrorCode.StateError) {
+                statusCode = 403;
+                message = error.message;
+            }else if(error.name == ErrorCode.NotFoundError) {
+                statusCode = 404;
+                message = error.message;
+            }else {
+                statusCode = 500;
+                message = "An error has occurred on the server. Please contact the administrator.";
+            }
+        }
+        if(typeof statusCode == "number") {
+            response.writeHead(statusCode, {
+                "Access-Control-Allow-Origin": this.acccessControl.allowOrigin,
+                "Content-Type": "text/plain"
+            });
+        }
+        if(message != null) {
+            response.write(message);
+        }
+        response.end();
+    }
 }

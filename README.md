@@ -23,7 +23,7 @@ interfaces:
 * `open-api.yaml` is the OpenAPI definition file in your Node.js project.
   * At least OAuth2 clientCredentials must be defined in `components.securitySchemes`.
 * `route.yaml` associates the request URL with the JS module in your Node.js project.
-* `authentication.js` is the OAuth authentication implementation in your Node.js project.
+* `authentication.js` is the OAuth authentication (client credentials grant) implementation in your Node.js project.
 * `authenticate` is a function of `authentication.js` and is the logic that performs authentication.
 * `authorization.js` is the OAuth authorization implementation in your Node.js project.
 * `authorize` is a function of `authorization.js` and is the logic that performs authorization.

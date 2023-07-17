@@ -40,6 +40,7 @@
  * @property {object} properties
  * @property {Schema} items
  * @property {Array<string>} enum
+ * @property {Array<string>} required
  */
 
 import FileSystem from "fs";
@@ -339,6 +340,7 @@ export class Router {
                             if(!Router.validate(responseBody, responseSpec["application/json"].schema, this.components)) {
                                 this.sendError(response, 500, "Internal server error.");
                                 writeError(`The response differs from the interface definition.\n${JSON.stringify(responseBody, null, 4)}\nDefinition:\n${JSON.stringify(responseSpec["application/json"].schema, null, 4)}`);
+                                return;
                             }
                             this.sendJson(response, responseBody);
                         }else {
@@ -370,6 +372,9 @@ export class Router {
             });
             if(component != null) {
                 spec = component;
+            }else {
+                writeError(`The component ${spec["$ref"]} is not specified.`);
+                return false;
             }
         }
         if(spec.type == "string") {
@@ -410,9 +415,26 @@ export class Router {
             if(typeof value != "object") {
                 return false;
             }
+            if(spec.required != null) {
+                let required = spec.required.every(required => {
+                    let result = value[required] !== undefined;
+                    if(!result) {
+                        writeError(`The property ${required} is required.`);
+                    }
+                    return result;
+                });
+                if(!required) {
+                    return false;
+                }
+            }
             if(spec.properties != null) {
                 return Object.keys(spec.properties).every(propertyName => {
-                    return Router.validate(value[propertyName], spec.properties[propertyName], components);
+                    let childSpec = spec.properties[propertyName];
+                    let result = Router.validate(value[propertyName], childSpec, components);
+                    if(!result && childSpec != "object" && childSpec != "array") {
+                        writeError(`The property ${propertyName} violates the definition.`);
+                    }
+                    return result;
                 });
             }
         }else if(spec.type == "array") {

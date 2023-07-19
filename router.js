@@ -177,7 +177,7 @@ export class Router {
                 return;
             }
             let _requestPath = requestPath.substring(0, index+1);
-            let path = Object.keys(this.paths).find(path => path.startsWith(_requestPath));
+            let path = Object.keys(this.paths).find(path => path.startsWith(_requestPath+"{"));
             if(path != null) {
                 spec = this.paths[path];
             }
@@ -225,7 +225,7 @@ export class Router {
                 return;
             }
             let _requestPath = requestPath.substring(0, index+1);
-            let path = Object.keys(this.routeDefinition).find(path => path.startsWith(_requestPath));
+            let path = Object.keys(this.routeDefinition).find(path => path.startsWith(_requestPath+"{"));
             if(path != null) {
                 let route = this.routeDefinition[path];
                 if(route != null) {

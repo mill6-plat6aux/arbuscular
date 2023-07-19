@@ -270,14 +270,28 @@ export class Router {
                 requestBody = {};
                 let result = spec.parameters.every(parameterSpec => {
                     if(parameterSpec.in != "query") {
-                        return false;
+                        return true;
                     }
                     let key = parameterSpec.name;
                     let type = parameterSpec.schema.type;
-                    if(type == "number") {
-                        requestBody[key] = Number(queryParameters[key]);
-                    }else {
-                        requestBody[key] = queryParameters[key];
+                    let value = queryParameters[key];
+                    if(parameterSpec.required != undefined && parameterSpec.required && value === undefined) {
+                        return false;
+                    }
+                    if(value !== undefined) {
+                        if(type == "number") {
+                            if(!/^[0-9.-]+$/.test(value)) {
+                                return false;
+                            }
+                            requestBody[key] = Number(value);
+                        }else if(type == "boolean") {
+                            if(value != "true" && value != "false" && value != "1" && value != "0") {
+                                return false;
+                            }
+                            requestBody[key] = value == "true" || value == "1";
+                        }else {
+                            requestBody[key] = value;
+                        }
                     }
                     return true;
                 });
@@ -317,7 +331,7 @@ export class Router {
         }
         let responseBody;
         try {
-            responseBody = await targetFunction.apply(null, [session, requestBody]);
+            responseBody = await targetFunction.apply(null, [session, requestBody, request.headers, response]);
         }catch(error) {
             writeError(error.message+"\n"+error.stack);
             this.sendError(response, error);
@@ -330,9 +344,10 @@ export class Router {
                 let responseSpec = spec.responses["200"].content;
                 if(typeof responseBody == "object") {
                     if(responseBody instanceof DownloadFile) {
-                        if(responseSpec["application/pdf"] != null) {
+                        if(responseSpec[responseBody.dataType] != null) {
                             this.sendFile(response, responseBody.data, responseBody.dataType, responseBody.fileName);
                         }else {
+                            writeError(`The response could not be processed successfully. definition: ${Object.keys(responseSpec).join(",")}, response: ${responseBody.dataType}`);
                             this.sendError(response, 500, "Internal server error.");
                         }
                     }else {
@@ -344,14 +359,30 @@ export class Router {
                             }
                             this.sendJson(response, responseBody);
                         }else {
+                            writeError(`The response could not be processed successfully. definition: ${Object.keys(responseSpec).join(",")}, response: ${responseBody}`);
                             this.sendError(response, 500, "Internal server error.");
                         }
                     }
+                }else if(typeof responseBody == "string") {
+                    if(responseSpec["text/plain"] != null) {
+                        this.sendText(response, responseBody);
+                    }else {
+                        writeError(`The response could not be processed successfully. definition: ${Object.keys(responseSpec).join(",")}, response: ${responseBody}`);
+                        this.sendError(response, 500, "Internal server error.");
+                    }
+                }else {
+                    writeError(`The response could not be processed successfully. definition: ${Object.keys(responseSpec).join(",")}, response: ${responseBody}`);
+                    this.sendError(response, 500, "Internal server error.");
                 }
             }else {
-                this.sendSuccess(response);
+                if(responseBody == null) {
+                    this.sendSuccess(response);
+                }else {
+                    writeError(`The response definition is not found.`);
+                }
             }
         }else {
+            writeError(`The response definition is not found.`);
             this.sendError(response, 500, "Internal server error.");
         }
     }
@@ -394,7 +425,7 @@ export class Router {
                     return false;
                 }
             }else if(spec.format == "uuid") {
-                if(!/^[0-9A-F]{8}-[0-9A-F]{4}-[1-4]{1}[0-9A-F]{3}-[0-9A-F]{4}-[0-9A-F]{12}$/.test(value)) {
+                if(!/^[0-9A-F]{8}-[0-9A-F]{4}-[1-4]{1}[0-9A-F]{3}-[0-9A-F]{4}-[0-9A-F]{12}$/.test(value) && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-4]{1}[0-9a-f]{3}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(value)) {
                     return false;
                 }
             }
@@ -415,22 +446,21 @@ export class Router {
             if(typeof value != "object") {
                 return false;
             }
-            if(spec.required != null) {
-                let required = spec.required.every(required => {
-                    let result = value[required] !== undefined;
-                    if(!result) {
-                        writeError(`The property ${required} is required.`);
-                    }
-                    return result;
-                });
-                if(!required) {
-                    return false;
-                }
-            }
             if(spec.properties != null) {
-                return Object.keys(spec.properties).every(propertyName => {
-                    let childSpec = spec.properties[propertyName];
-                    let result = Router.validate(value[propertyName], childSpec, components);
+                let required = spec.required != null && Array.isArray(spec.required) ? spec.required : [];
+                let properties = spec.properties;
+                return Object.keys(properties).every(propertyName => {
+                    let childValue = value[propertyName];
+                    if(childValue === undefined) {
+                        if(required.includes(propertyName)) {
+                            writeError(`The property ${propertyName} is required.`);
+                            return false;
+                        }else {
+                            return true;
+                        }
+                    }
+                    let childSpec = properties[propertyName];
+                    let result = Router.validate(childValue, childSpec, components);
                     if(!result && childSpec != "object" && childSpec != "array") {
                         writeError(`The property ${propertyName} violates the definition.`);
                     }
@@ -486,6 +516,17 @@ export class Router {
             "Content-Type": dataType
         });
         response.end(data);
+    }
+    
+    /**
+     * @param {ServerResponse} response 
+     */
+    sendText(response, text) {
+        response.writeHead(200, text, {
+            "Access-Control-Allow-Origin": this.acccessControl.allowOrigin,
+            "Content-Type": "text/plain"
+        });
+        response.end();
     }
     
     /**

@@ -1,6 +1,12 @@
 # Arbuscular
 
-The frivolous API front-end 😂
+The ultra-lightweight API server 😋
+
+
+## Architecture
+
+![Architecture](https://raw.github.com/mill6-plat6aux/arbuscular/main/architecture.svg)
+
 
 ## Setup
 

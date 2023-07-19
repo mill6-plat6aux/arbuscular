@@ -23,6 +23,10 @@ let setting = YAML.parse(settingFile);
 
 let interfaces = setting.interfaces.map(interfaceSpec => {
     return {contextPath: interfaceSpec.contextPath, router: new Router(interfaceSpec)};
+}).sort((entry1, entry2) => {
+    let length1 = entry1.contextPath.length;
+    let length2 = entry2.contextPath.length;
+    return length1 < length2 ? 1 : (length1 > length2 ? -1 : 0);
 });
 
 if(setting.port == undefined) {

@@ -22,7 +22,7 @@ export class DownloadFile {
     /**
      * @param {Buffer} data 
      * @param {string} dataType MIME Types
-     * @param {string} fileName File name
+     * @param {string | null} fileName File name
      */
     constructor(data, dataType, fileName) {
         this.data = data;

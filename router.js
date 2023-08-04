@@ -194,7 +194,7 @@ export class Router {
         // retrieve method
         let methodSpec = spec[request.method.toLowerCase()];
         if(methodSpec != null) {
-            if(spec.parameters != null) {
+            if(spec.parameters != null && spec.parameters.length > 0) {
                 methodSpec.parameters = spec.parameters;
             }
             spec = methodSpec;
@@ -379,6 +379,7 @@ export class Router {
                     this.sendSuccess(response);
                 }else {
                     writeError(`The response definition is not found.`);
+                    this.sendError(response, 500, "Internal server error.");
                 }
             }
         }else {
@@ -508,13 +509,17 @@ export class Router {
      * @param {ServerResponse} response 
      * @param {Buffer} data 
      * @param {string} dataType 
-     * @param {string} fileName 
+     * @param {string | null} fileName 
      */
     sendFile(response, data, dataType, fileName) {
-        response.writeHead(200, {
+        let header = {
             "Access-Control-Allow-Origin": this.acccessControl.allowOrigin,
             "Content-Type": dataType
-        });
+        };
+        if(fileName != null) {
+            header["Content-Disposition"] = `attachment; filename="${fileName}"`;
+        }
+        response.writeHead(200, header);
         response.end(data);
     }
     

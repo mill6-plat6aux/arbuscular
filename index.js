@@ -42,7 +42,12 @@ if(setting.acccessControl == undefined) {
 }
 
 const server = Http.createServer((request, response) => {
-    let interfaceSpec = interfaces.find(interfaceSpec => request.url?.startsWith(interfaceSpec.contextPath));
+    let requestPath = request.url != null ? request.url : "";
+    let interfaceSpec = interfaces.find(interfaceSpec => {
+        return requestPath == interfaceSpec.contextPath || 
+            (requestPath.startsWith(interfaceSpec.contextPath) && 
+            requestPath.substring(interfaceSpec.contextPath.length).startsWith("/"));
+    });
     if(interfaceSpec == null) {
         response.writeHead(404, {
             "Access-Control-Allow-Origin": setting.acccessControl.allowOrigin,

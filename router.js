@@ -47,10 +47,10 @@ import FileSystem from "fs";
 import Path from "path";
 import QueryString from "querystring";
 import YAML from "yaml";
-import { parse } from "./body-parser.js";
-import { error, ErrorCode } from "./errors.js";
-import { DownloadFile } from "./files.js";
-import { LogLevel, writeError, writeLog } from "./logger.js";
+import { parse } from "./utility/body-parser.js";
+import { error, ErrorCode } from "./utility/errors.js";
+import { DownloadFile } from "./utility/files.js";
+import { LogLevel, writeError, writeLog } from "./utility/logger.js";
 
 export class Router {
     /**
@@ -75,7 +75,12 @@ export class Router {
         this.acccessControl = setting.acccessControl;
 
         if(setting.interface != null) {
-            let interfaceDefinition = YAML.parse(FileSystem.readFileSync(setting.interface, "utf8"));
+            let interfaceDefinition;
+            if(typeof setting.interface == "string") {
+                interfaceDefinition = YAML.parse(FileSystem.readFileSync(setting.interface, "utf8"));
+            }else {
+                interfaceDefinition = setting.interface;
+            }
             this.spec = interfaceDefinition;
 
             this.paths = interfaceDefinition.paths;
@@ -92,7 +97,13 @@ export class Router {
             });
         }
         if(setting.route != null) {
-            this.routeDefinition = YAML.parse(FileSystem.readFileSync(setting.route, "utf8"));
+            let routeDefinition;
+            if(typeof setting.interface == "string") {
+                routeDefinition = YAML.parse(FileSystem.readFileSync(setting.route, "utf8"));
+            }else {
+                routeDefinition = setting.route;
+            }
+            this.routeDefinition = routeDefinition;
         }
         if(setting.authentication != null && setting.authentication.module != null && setting.authentication.function != null) {
             import(Path.resolve(setting.authentication.module)).then(module => {
@@ -263,6 +274,18 @@ export class Router {
                     writeError(`The request differs from the interface definition.:\n${JSON.stringify(requestBody, null, 4)}\nDefinition:\n${JSON.stringify(requestSpec.schema, null, 4)}`, LogLevel.error);
                     this.sendError(response, 400, "Request format is not supported.");
                     return;
+                }
+            }
+
+            if(pathParameter != null) {
+                if(spec.parameters.length == 1 && spec.parameters[0].in == "path") {
+                    let key = spec.parameters[0].name;
+                    let type = spec.parameters[0].schema.type;
+                    if(type == "number") {
+                        requestBody[key] = Number(pathParameter);
+                    }else {
+                        requestBody[key] = pathParameter;
+                    }
                 }
             }
         }else if(spec.parameters != null) {

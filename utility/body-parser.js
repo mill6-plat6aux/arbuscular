@@ -58,7 +58,7 @@ export async function parse(request, settings) {
         try {
             body = await parseFormData(request, settings);
         }catch(error) {
-            throw new Error("The file format you specify is not supported.");
+            throw new Error("The file format you specify is not supported. "+error.message);
         }
     }else {
         let method = request.method != null ? request.method.toUpperCase() : "GET";

@@ -35,12 +35,16 @@
 
 /**
  * @typedef {object} Schema
- * @property {"string"|"number"|"boolean"|"object"|"array"} type
- * @property {"date-time"|"date"|"time"|"byte"|"email"|"uuid"} format
- * @property {object} properties
- * @property {Schema} items
- * @property {Array<string>} enum
- * @property {Array<string>} required
+ * @property {"string"|"number"|"boolean"|"object"|"array"} [type]
+ * @property {"date-time"|"date"|"time"|"byte"|"email"|"uuid"} [format]
+ * @property {object} [properties]
+ * @property {Schema} [items]
+ * @property {Array<string>} [enum]
+ * @property {Array<string>} [required]
+ * @property {string} [$ref]
+ * @property {Array<Schema>} [anyOf] Any of the schema of the child element
+ * @property {Array<Schema>} [allOf] All of the schema of the child element
+ * @property {Array<Schema>} [oneOf] One of the schema of the child element
  */
 
 import FileSystem from "fs";
@@ -271,7 +275,7 @@ export class Router {
             }
             if(requestSpec != null && requestSpec.schema != null) {
                 if(!Router.validate(requestBody, requestSpec.schema, this.components)) {
-                    writeError(`The request differs from the interface definition.:\n${JSON.stringify(requestBody, null, 4)}\nDefinition:\n${JSON.stringify(requestSpec.schema, null, 4)}`, LogLevel.error);
+                    writeError(`The request differs from the interface definition.\n${request.method} ${requestPath}\nRequest:\n${JSON.stringify(requestBody, null, 4)}\nDefinition:\n${JSON.stringify(requestSpec.schema, null, 4)}`, LogLevel.error);
                     this.sendError(response, 400, "Request format is not supported.");
                     return;
                 }
@@ -370,19 +374,19 @@ export class Router {
                         if(responseSpec[responseBody.dataType] != null) {
                             this.sendFile(response, responseBody.data, responseBody.dataType, responseBody.fileName);
                         }else {
-                            writeError(`The response could not be processed successfully. definition: ${Object.keys(responseSpec).join(",")}, response: ${responseBody.dataType}`);
+                            writeError(`The response could not be processed successfully.\n${request.method} ${requestPath}\ndefinition: ${Object.keys(responseSpec).join(",")}, response: ${responseBody.dataType}`);
                             this.sendError(response, 500, "Internal server error.");
                         }
                     }else {
                         if(responseSpec["application/json"] != null) {
                             if(!Router.validate(responseBody, responseSpec["application/json"].schema, this.components)) {
                                 this.sendError(response, 500, "Internal server error.");
-                                writeError(`The response differs from the interface definition.\n${JSON.stringify(responseBody, null, 4)}\nDefinition:\n${JSON.stringify(responseSpec["application/json"].schema, null, 4)}`);
+                                writeError(`The response differs from the interface definition.\n${request.method} ${requestPath}\nResponse:\n${JSON.stringify(responseBody, null, 4)}\nDefinition:\n${JSON.stringify(responseSpec["application/json"].schema, null, 4)}`);
                                 return;
                             }
                             this.sendJson(response, responseBody);
                         }else {
-                            writeError(`The response could not be processed successfully. definition: ${Object.keys(responseSpec).join(",")}, response: ${responseBody}`);
+                            writeError(`The response could not be processed successfully.\n${request.method} ${requestPath}\ndefinition: ${Object.keys(responseSpec).join(",")}, response: ${responseBody}`);
                             this.sendError(response, 500, "Internal server error.");
                         }
                     }
@@ -390,23 +394,23 @@ export class Router {
                     if(responseSpec["text/plain"] != null) {
                         this.sendText(response, responseBody);
                     }else {
-                        writeError(`The response could not be processed successfully. definition: ${Object.keys(responseSpec).join(",")}, response: ${responseBody}`);
+                        writeError(`The response could not be processed successfully.\n${request.method} ${requestPath}\ndefinition: ${Object.keys(responseSpec).join(",")}, response: ${responseBody}`);
                         this.sendError(response, 500, "Internal server error.");
                     }
                 }else {
-                    writeError(`The response could not be processed successfully. definition: ${Object.keys(responseSpec).join(",")}, response: ${responseBody}`);
+                    writeError(`The response could not be processed successfully.\n${request.method} ${requestPath}\ndefinition: ${Object.keys(responseSpec).join(",")}, response: ${responseBody}`);
                     this.sendError(response, 500, "Internal server error.");
                 }
             }else {
                 if(responseBody == null) {
                     this.sendSuccess(response);
                 }else {
-                    writeError(`The response definition is not found.`);
+                    writeError(`The response definition is not found.\n${request.method} ${requestPath}`);
                     this.sendError(response, 500, "Internal server error.");
                 }
             }
         }else {
-            writeError(`The response definition is not found.`);
+            writeError(`The response definition is not found.\n${request.method} ${requestPath}`);
             this.sendError(response, 500, "Internal server error.");
         }
     }
@@ -467,7 +471,7 @@ export class Router {
                 return false;
             }
         }else if(spec.type == "object") {
-            if(typeof value != "object") {
+            if(typeof value != "object" || value == null) {
                 return false;
             }
             if(spec.properties != null) {
@@ -497,6 +501,7 @@ export class Router {
             }
             let elementSpec = spec.items;
             return value.every(childValue => {
+                if(elementSpec == null) return false;
                 return Router.validate(childValue, elementSpec, components);
             });
         }else if(spec.type == "null") {
@@ -511,6 +516,24 @@ export class Router {
                 _spec.type = type;
                 return Router.validate(value, _spec, components);
             });
+        }else if(spec.type == null) {
+            if(spec.anyOf != null && Array.isArray(spec.anyOf)) {
+                let specs = spec.anyOf;
+                return specs.some(childSpec => {
+                    return Router.validate(value, childSpec, components);
+                });
+            }else if(spec.allOf != null && Array.isArray(spec.allOf)) {
+                let specs = spec.allOf;
+                return specs.every(childSpec => {
+                    return Router.validate(value, childSpec, components);
+                });
+            }else if(spec.oneOf != null && Array.isArray(spec.oneOf)) {
+                let specs = spec.oneOf;
+                let result = specs.filter(childSpec => {
+                    return Router.validate(value, childSpec, components);
+                });
+                return result.length == 1;
+            }
         }
         return true;
     }

@@ -43,6 +43,14 @@ if(setting.acccessControl == undefined) {
 
 const server = Http.createServer((request, response) => {
     let requestPath = request.url != null ? request.url : "";
+    if(setting.healthCheckPath && requestPath == setting.healthCheckPath) {
+        response.writeHead(200, {
+            "Access-Control-Allow-Origin": setting.acccessControl.allowOrigin,
+            "Content-Type": "text/plain"
+        });
+        response.end();
+        return;
+    }
     let interfaceSpec = interfaces.find(interfaceSpec => {
         return requestPath == interfaceSpec.contextPath || 
             (requestPath.startsWith(interfaceSpec.contextPath) && 

@@ -76,8 +76,19 @@ export class Router {
                 allowMethods: "*",
                 httpsOnly: false
             };
-        }else if(setting.accessControl.allowOrigin == undefined) {
-            setting.accessControl.allowOrigin = "*";
+        }else {
+            if(setting.accessControl.allowOrigin == undefined) {
+                setting.accessControl.allowOrigin = "*";
+            }
+            if(setting.accessControl.allowHeaders == undefined) {
+                setting.accessControl.allowHeaders = "*";
+            }
+            if(setting.accessControl.allowMethods == undefined) {
+                setting.accessControl.allowMethods = "*";
+            }
+            if(setting.accessControl.httpsOnly == undefined) {
+                setting.accessControl.httpsOnly = false;
+            }
         }
         this.accessControl = setting.accessControl;
 

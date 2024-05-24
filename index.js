@@ -46,6 +46,7 @@ const server = Http.createServer((request, response) => {
     if(setting.healthCheckPath && requestPath == setting.healthCheckPath) {
         response.writeHead(200, {
             "Access-Control-Allow-Origin": setting.acccessControl.allowOrigin,
+            "X-Content-Type-Options": "nosniff",
             "Content-Type": "text/plain"
         });
         response.end();
@@ -59,6 +60,7 @@ const server = Http.createServer((request, response) => {
     if(interfaceSpec == null) {
         response.writeHead(404, {
             "Access-Control-Allow-Origin": setting.acccessControl.allowOrigin,
+            "X-Content-Type-Options": "nosniff",
             "Content-Type": "text/plain"
         });
         response.write("Not found.");
@@ -69,10 +71,9 @@ const server = Http.createServer((request, response) => {
     let router = interfaceSpec.router;
     router.route(request, response).catch(error => {
         writeError(error.message+"\n"+error.stack);
-        response.writeHead(500, {
-            "Access-Control-Allow-Origin": setting.acccessControl.allowOrigin,
-            "Content-Type": "text/plain"
-        });
+        let headers = router.headers;
+        headers["Content-Type"] = "text/plain";
+        response.writeHead(500, headers);
         response.write("An error has occurred on the server. Please contact the administrator.");
         response.end();
     });

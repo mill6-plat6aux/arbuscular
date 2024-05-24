@@ -21,6 +21,7 @@
  * @property {string} allowOrigin * or origin
  * @property {string} allowHeaders * or HTTP headers
  * @property {string} allowMethods * or HTTP methods
+ * @property {boolean} httpsOnly
  */
 
 /**
@@ -31,6 +32,7 @@
  * @property {Module} authentication
  * @property {Module} authorization 
  * @property {AccessControl} acccessControl
+ * @property {object} customHeaders
  */
 
 /**
@@ -72,11 +74,14 @@ export class Router {
                 allowOrigin: "*",
                 allowHeaders: "*",
                 allowMethods: "*",
+                httpsOnly: false
             };
         }else if(setting.acccessControl.allowOrigin == undefined) {
             setting.acccessControl.allowOrigin = "*";
         }
         this.acccessControl = setting.acccessControl;
+
+        this.customHeaders = setting.customHeaders;
 
         if(setting.interface != null) {
             let interfaceDefinition;
@@ -539,14 +544,33 @@ export class Router {
     }
 
     /**
+     * @returns {object}
+     */
+    get headers() {
+        let headers = {
+            "Access-Control-Allow-Origin": this.acccessControl.allowOrigin,
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "no-store"
+        };
+        if(this.acccessControl.httpsOnly) {
+            headers["Strict-Transport-Security"] = "Strict-Transport-Security: max-age=31536000; includeSubDomains";
+        }
+        if(this.customHeaders != null) {
+            Object.keys(this.customHeaders).forEach(key => {
+                headers[key] = this.customHeaders[key];
+            });
+        }
+        return headers;
+    }
+
+    /**
      * @param {ServerResponse} response 
      * @param {object} data 
      */
     sendJson(response, data) {
-        response.writeHead(200, {
-            "Access-Control-Allow-Origin": this.acccessControl.allowOrigin,
-            "Content-Type": "application/json"
-        });
+        let headers = this.headers;
+        headers["Content-Type"] = "application/json";
+        response.writeHead(200, headers);
         response.write(JSON.stringify(data));
         response.end();
     }
@@ -558,14 +582,12 @@ export class Router {
      * @param {string | null} fileName 
      */
     sendFile(response, data, dataType, fileName) {
-        let header = {
-            "Access-Control-Allow-Origin": this.acccessControl.allowOrigin,
-            "Content-Type": dataType
-        };
+        let headers = this.headers;
+        headers["Content-Type"] = dataType;
         if(fileName != null) {
-            header["Content-Disposition"] = `attachment; filename="${fileName}"`;
+            headers["Content-Disposition"] = `attachment; filename="${fileName}"`;
         }
-        response.writeHead(200, header);
+        response.writeHead(200, headers);
         response.end(data);
     }
     
@@ -573,10 +595,9 @@ export class Router {
      * @param {ServerResponse} response 
      */
     sendText(response, text) {
-        response.writeHead(200, text, {
-            "Access-Control-Allow-Origin": this.acccessControl.allowOrigin,
-            "Content-Type": "text/plain"
-        });
+        let headers = this.headers;
+        headers["Content-Type"] = "text/plain";
+        response.writeHead(200, text, headers);
         response.end();
     }
     
@@ -584,11 +605,10 @@ export class Router {
      * @param {ServerResponse} response 
      */
     sendSuccess(response) {
-        response.writeHead(200, {
-            "Access-Control-Allow-Origin": this.acccessControl.allowOrigin,
-            "Access-Control-Allow-Headers": this.acccessControl.allowHeaders,
-            "Access-Control-Allow-Methods": this.acccessControl.allowMethods
-        });
+        let headers = this.headers;
+        headers["Access-Control-Allow-Headers"] = this.acccessControl.allowHeaders;
+        headers["Access-Control-Allow-Methods"] = this.acccessControl.allowMethods;
+        response.writeHead(200, headers);
         response.end();
     }
     
@@ -624,10 +644,9 @@ export class Router {
             }
         }
         if(typeof statusCode == "number") {
-            response.writeHead(statusCode, {
-                "Access-Control-Allow-Origin": this.acccessControl.allowOrigin,
-                "Content-Type": "text/plain"
-            });
+            let headers = this.headers;
+            headers["Content-Type"] = "text/plain";
+            response.writeHead(statusCode, headers);
         }
         if(message != null) {
             response.write(message);

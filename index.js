@@ -33,19 +33,19 @@ if(setting.port == undefined) {
     setting.port = 3000;
 }
 
-if(setting.acccessControl == undefined) {
-    setting.acccessControl = {
+if(setting.accessControl == undefined) {
+    setting.accessControl = {
         allowOrigin: "*"
     };
-}else if(setting.acccessControl.allowOrigin == undefined) {
-    setting.acccessControl.allowOrigin = "*";
+}else if(setting.accessControl.allowOrigin == undefined) {
+    setting.accessControl.allowOrigin = "*";
 }
 
 const server = Http.createServer((request, response) => {
     let requestPath = request.url != null ? request.url : "";
     if(setting.healthCheckPath && requestPath == setting.healthCheckPath) {
         response.writeHead(200, {
-            "Access-Control-Allow-Origin": setting.acccessControl.allowOrigin,
+            "Access-Control-Allow-Origin": setting.accessControl.allowOrigin,
             "X-Content-Type-Options": "nosniff",
             "Content-Type": "text/plain"
         });
@@ -59,7 +59,7 @@ const server = Http.createServer((request, response) => {
     });
     if(interfaceSpec == null) {
         response.writeHead(404, {
-            "Access-Control-Allow-Origin": setting.acccessControl.allowOrigin,
+            "Access-Control-Allow-Origin": setting.accessControl.allowOrigin,
             "X-Content-Type-Options": "nosniff",
             "Content-Type": "text/plain"
         });

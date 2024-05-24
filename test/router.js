@@ -131,7 +131,7 @@ describe("Router", () => {
                 module: "./test/router.js",
                 function: "authorize"
             },
-            acccessControl: {
+            accessControl: {
                 allowOrigin: "*",
                 allowHeaders: "Content-Type, Authorization",
                 allowMethods: "GET, POST, PUT, DELETE"

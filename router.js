@@ -31,7 +31,7 @@
  * @property {string} route The path of the file that defines the relationship between the request path and the module
  * @property {Module} authentication
  * @property {Module} authorization 
- * @property {AccessControl} acccessControl
+ * @property {AccessControl} accessControl
  * @property {object} customHeaders
  */
 
@@ -69,17 +69,17 @@ export class Router {
         this.authenticateFunction;
         this.authorizeFunction;
 
-        if(setting.acccessControl == undefined) {
-            setting.acccessControl = {
+        if(setting.accessControl == undefined) {
+            setting.accessControl = {
                 allowOrigin: "*",
                 allowHeaders: "*",
                 allowMethods: "*",
                 httpsOnly: false
             };
-        }else if(setting.acccessControl.allowOrigin == undefined) {
-            setting.acccessControl.allowOrigin = "*";
+        }else if(setting.accessControl.allowOrigin == undefined) {
+            setting.accessControl.allowOrigin = "*";
         }
-        this.acccessControl = setting.acccessControl;
+        this.accessControl = setting.accessControl;
 
         this.customHeaders = setting.customHeaders;
 
@@ -548,11 +548,11 @@ export class Router {
      */
     get headers() {
         let headers = {
-            "Access-Control-Allow-Origin": this.acccessControl.allowOrigin,
+            "Access-Control-Allow-Origin": this.accessControl.allowOrigin,
             "X-Content-Type-Options": "nosniff",
             "Cache-Control": "no-store"
         };
-        if(this.acccessControl.httpsOnly) {
+        if(this.accessControl.httpsOnly) {
             headers["Strict-Transport-Security"] = "Strict-Transport-Security: max-age=31536000; includeSubDomains";
         }
         if(this.customHeaders != null) {
@@ -606,8 +606,8 @@ export class Router {
      */
     sendSuccess(response) {
         let headers = this.headers;
-        headers["Access-Control-Allow-Headers"] = this.acccessControl.allowHeaders;
-        headers["Access-Control-Allow-Methods"] = this.acccessControl.allowMethods;
+        headers["Access-Control-Allow-Headers"] = this.accessControl.allowHeaders;
+        headers["Access-Control-Allow-Methods"] = this.accessControl.allowMethods;
         response.writeHead(200, headers);
         response.end();
     }

@@ -1,6 +1,6 @@
 {
   "name": "arbuscular",
-  "version": "0.9.13",
+  "version": "0.9.14",
   "description": "The ultra-lightweight API server 😋",
   "keywords": [
     "REST",
@@ -20,7 +20,11 @@
     "test": "mocha --exit ./**/*.js"
   },
   "files": [
-    "test"
+    "index.js",
+    "router.js",
+    "utility",
+    "spi.d.ts",
+    "images"
   ],
   "dependencies": {
     "busboy": "^1.6.0",

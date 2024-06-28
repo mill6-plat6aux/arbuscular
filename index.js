@@ -18,7 +18,28 @@ import Http from "http";
 import { Router } from "./router.js";
 import { writeError } from "./utility/logger.js";
 
-let settingFile = readFileSync("arbuscular.yaml", "utf8");
+let settingFilePath = "arbuscular.yaml";
+
+if(process.argv.length > 2) {
+    let args = process.argv;
+    for(let i=2; i<args.length; i++) {
+        let argument = args[i];
+        if(argument.startsWith("--") && argument.length > 1) {
+            let key = argument.substring(2);
+            let value;
+            if(i<args.length-1) {
+                value = args[i+1];
+                i++;
+            }
+            if(value == null) continue;
+            if(key == "setting") {
+                settingFilePath = value;
+            }
+        }
+    }
+}
+
+let settingFile = readFileSync(settingFilePath, "utf8");
 let setting = YAML.parse(settingFile);
 
 let interfaces = setting.interfaces.map(interfaceSpec => {

@@ -1,6 +1,13 @@
-# Arbuscular
-
-The ultra-lightweight API server 😋
+<div align="center">
+    <div>
+        <picture>
+            <source media="(prefers-color-scheme: dark)" srcset="https://github.com/mill6-plat6aux/arbuscular/raw/main/images/title-w.png"/>
+            <img src="https://github.com/mill6-plat6aux/arbuscular/raw/main/images/title-b.png" width="320"/>
+        </picture>
+    </div>
+    The ultra-lightweight API server 😋
+    <br/><br/><br/>
+</div>
 
 
 ## Architecture
@@ -51,3 +58,13 @@ Finally, `npm install arbuscular` in your Node.js project and `npx arbuscular` w
 ## License
 
 [MIT](https://github.com/mill6-plat6aux/arbuscular/blob/main/LICENSE)
+
+
+## Developers
+
+[Takuro Okada](mailto:mill6.plat6aux@gmail.com)
+
+
+---
+
+&copy; Takuro Okada

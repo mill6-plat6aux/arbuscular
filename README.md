@@ -2,7 +2,7 @@
     <div>
         <picture>
             <source media="(prefers-color-scheme: dark)" srcset="https://github.com/mill6-plat6aux/arbuscular/raw/main/images/title-w.svg"/>
-            <img src="https://github.com/mill6-plat6aux/arbuscular/raw/main/images/title-b.svg" width="320"/>
+            <img src="https://github.com/mill6-plat6aux/arbuscular/raw/main/images/title-b.svg" width="480"/>
         </picture>
     </div>
     The ultra-lightweight API server 😋

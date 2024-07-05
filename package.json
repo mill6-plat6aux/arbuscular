@@ -23,8 +23,7 @@
     "index.js",
     "router.js",
     "utility",
-    "spi.d.ts",
-    "images"
+    "index.d.ts"
   ],
   "dependencies": {
     "busboy": "^1.6.0",

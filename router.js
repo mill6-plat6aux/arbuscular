@@ -127,13 +127,13 @@ export class Router {
         }
         if(setting.authentication != null && setting.authentication.module != null && setting.authentication.function != null) {
             import(Path.resolve(setting.authentication.module)).then(module => {
-                /** @type {import("./spi.js").authenticate} */
+                /** @type {import("./index").authenticate} */
                 this.authenticateFunction = module[setting.authentication.function];
             });
         }
         if(setting.authorization != null && setting.authorization.module != null && setting.authorization.function != null) {
             import(Path.resolve(setting.authorization.module)).then(module => {
-                /** @type {import("./spi.js").authorize} */
+                /** @type {import("./index").authorize} */
                 this.authorizeFunction = module[setting.authorization.function];
             });
         }
@@ -366,7 +366,7 @@ export class Router {
             this.sendError(response, 404, "Not found.");
             return;
         }
-        /** @type {import("./spi.js").handle} */
+        /** @type {import("./index").handle} */
         let targetFunction = module[target.function];
         if(targetFunction == null) {
             this.sendError(response, 404, "Not found.");

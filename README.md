@@ -5,6 +5,7 @@
             <img src="https://github.com/mill6-plat6aux/arbuscular/raw/main/images/title-b.svg" width="480"/>
         </picture>
     </div>
+    <br/>
     The ultra-lightweight API server 😋
     <br/><br/><br/>
 </div>

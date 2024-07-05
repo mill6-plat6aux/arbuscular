@@ -11,7 +11,7 @@ export const ErrorCode = {
     AuthorizationError: "AuthorizationError",
     RequestError: "RequestError",
     StateError: "StateError",
-    NotFoundError: "NotFoundError",
+    NotFoundError: "NotFoundError"
 }
 
 /**

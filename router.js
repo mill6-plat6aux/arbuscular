@@ -123,6 +123,19 @@ export class Router {
             }else {
                 routeDefinition = setting.route;
             }
+            if(routeDefinition != null) {
+                Object.keys(routeDefinition).forEach(key => {
+                    let methods = routeDefinition[key];
+                    Object.keys(methods).forEach(method => {
+                        if(/^[A-Z]+$/.test(method)) {
+                            let _method = method.toLowerCase();
+                            methods[_method] = methods[method];
+                            delete methods[method];
+                        }
+                    });
+                    routeDefinition[key] = methods;
+                });
+            }
             this.routeDefinition = routeDefinition;
         }
         if(setting.authentication != null && setting.authentication.module != null && setting.authentication.function != null) {
@@ -260,13 +273,13 @@ export class Router {
             if(path != null) {
                 let route = this.routeDefinition[path];
                 if(route != null) {
-                    target = route[request.method];
+                    target = route[request.method.toLocaleLowerCase()];
                 }
             }
         }else {
             let route = this.routeDefinition[requestPath];
             if(route != null) {
-                target = route[request.method];
+                target = route[request.method.toLocaleLowerCase()];
             }
         }
         if(target == null) {

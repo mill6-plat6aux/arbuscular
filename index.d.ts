@@ -8,14 +8,14 @@
  * @param request HTTP request
  * @returns Return value of REST API (HTTP body), Usually contains access_token property
  */
-export type authenticate = (request: IncomingMessage) => object;
+export type authenticate = (request: IncomingMessage) => Promise<any>;
 
 /**
  * Authorization Function of the REST API
  * @param request HTTP request
  * @returns Session object returned from authorization functions (e.g., containing user IDs, etc.)
  */
-export type authorize = (request: IncomingMessage) => object;
+export type authorize = (request: IncomingMessage) => Promise<any>;
 
 /**
  * Functions as REST API implementations
@@ -23,7 +23,7 @@ export type authorize = (request: IncomingMessage) => object;
  * @param request REST API parameters (HTTP body, query parameters, path parameters)
  * @returns  Return value of REST API (HTTP body) 
  */
-export type handle = (session: object, request: object) => object;
+export type handle = (session: any, request: any) => Promise<any>;
 
 /**
  * Parses HTTP requests and converts them to JSON objects.

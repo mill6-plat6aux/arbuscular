@@ -33,6 +33,7 @@
  * @property {Module} authorization 
  * @property {AccessControl} accessControl
  * @property {object} customHeaders
+ * @property {object} customErrorHeaders
  */
 
 /**
@@ -54,7 +55,7 @@ import Path from "path";
 import QueryString from "querystring";
 import YAML from "yaml";
 import { parse } from "./utility/body-parser.js";
-import { error, ErrorCode } from "./utility/errors.js";
+import { ErrorCode } from "./utility/errors.js";
 import { DownloadFile } from "./utility/files.js";
 import { LogLevel, writeError, writeLog } from "./utility/logger.js";
 
@@ -93,6 +94,7 @@ export class Router {
         this.accessControl = setting.accessControl;
 
         this.customHeaders = setting.customHeaders;
+        this.customErrorHeaders = setting.customErrorHeaders;
 
         if(setting.interface != null) {
             let interfaceDefinition;
@@ -173,7 +175,7 @@ export class Router {
             return;
         }
 
-        writeLog(`${request.method} ${request.url}`, LogLevel.debug);
+        writeLog(`${request.method} ${request.url}`, LogLevel.info);
 
         let requestPath = request.url.substring(this.contextPath.length);
 
@@ -211,28 +213,20 @@ export class Router {
         // retrieve spec
         let spec = this.paths[requestPath];
 
-        let pathParameter;
-        
+        let pathWithPathParameters;
+        let pathParameters = [];
         if(spec == null) {
-            // retrieve path parameter
-            let index = requestPath.lastIndexOf("/");
-            if(index == requestPath.length-1) {
-                this.sendError(response, 404, "Not found.");
-                return;
+            pathWithPathParameters = this.retrievePathParameters(requestPath, pathParameters);
+            if(pathWithPathParameters != null && pathParameters.length > 0) {
+                spec = this.paths[pathWithPathParameters];
+                pathParameters.reverse();
             }
-            let _requestPath = requestPath.substring(0, index+1);
-            let path = Object.keys(this.paths).find(path => path.startsWith(_requestPath+"{"));
-            if(path != null) {
-                spec = this.paths[path];
-            }
-            if(path != null && spec != null) {
-                pathParameter = requestPath.substring(index+1);
-                requestPath = path;
-            }else {
-                writeLog(`Requested with a path parameter, but no corresponding REST API was found. ${request.method} ${request.url}`, LogLevel.info);
-                this.sendError(response, 404, "Not found.");
-                return;
-            }
+        }
+
+        if(spec == null) {
+            writeLog(`No corresponding REST API was found. ${request.method} ${request.url}`, LogLevel.info);
+            this.sendError(response, 404, "Not found.");
+            return;
         }
 
         // retrieve method
@@ -262,19 +256,10 @@ export class Router {
 
         // retrieve routing target
         let target;
-        if(pathParameter != null) {
-            let index = requestPath.lastIndexOf("/");
-            if(index == requestPath.length-1) {
-                this.sendError(response, 404, "Not found.");
-                return;
-            }
-            let _requestPath = requestPath.substring(0, index+1);
-            let path = Object.keys(this.routeDefinition).find(path => path.startsWith(_requestPath+"{"));
-            if(path != null) {
-                let route = this.routeDefinition[path];
-                if(route != null) {
-                    target = route[request.method.toLocaleLowerCase()];
-                }
+        if(pathWithPathParameters != null) {
+            let route = this.routeDefinition[pathWithPathParameters];
+            if(route != null) {
+                target = route[request.method.toLocaleLowerCase()];
             }
         }else {
             let route = this.routeDefinition[requestPath];
@@ -310,16 +295,20 @@ export class Router {
                 }
             }
 
-            if(pathParameter != null) {
-                if(spec.parameters.length == 1 && spec.parameters[0].in == "path") {
-                    let key = spec.parameters[0].name;
-                    let type = spec.parameters[0].schema.type;
-                    if(type == "number") {
-                        requestBody[key] = Number(pathParameter);
-                    }else {
-                        requestBody[key] = pathParameter;
+            if(pathParameters.length > 0) {
+                pathParameters.forEach((pathParameter, index) => {
+                    if(index < spec.parameters.length && spec.parameters[index].in == "path") {
+                        let key = spec.parameters[index].name;
+                        let type = spec.parameters[index].schema.type;
+                        if(type == "number" || type == "integer") {
+                            requestBody[key] = Number(pathParameter);
+                        }else if(type == "boolean") {
+                            requestBody[key] = pathParameter == "true" || pathParameter == "1";
+                        }else {
+                            requestBody[key] = pathParameter;
+                        }
                     }
-                }
+                });
             }
         }else if(spec.parameters != null) {
             if(queryParameters != null) {
@@ -355,17 +344,21 @@ export class Router {
                     this.sendError(response, 400, "Request format is not supported.");
                     return;
                 }
-            }else if(pathParameter != null) {
-                if(spec.parameters.length == 1 && spec.parameters[0].in == "path") {
-                    let key = spec.parameters[0].name;
-                    let type = spec.parameters[0].schema.type;
-                    requestBody = {};
-                    if(type == "number") {
-                        requestBody[key] = Number(pathParameter);
-                    }else {
-                        requestBody[key] = pathParameter;
+            }else if(pathParameters.length > 0) {
+                pathParameters.forEach((pathParameter, index) => {
+                    if(index < spec.parameters.length && spec.parameters[index].in == "path") {
+                        let key = spec.parameters[index].name;
+                        let type = spec.parameters[index].schema.type;
+                        requestBody = {};
+                        if(type == "number" || type == "integer") {
+                            requestBody[key] = Number(pathParameter);
+                        }else if(type == "boolean") {
+                            requestBody[key] = pathParameter == "true" || pathParameter == "1";
+                        }else {
+                            requestBody[key] = pathParameter;
+                        }
                     }
-                }
+                });
             }
         }
 
@@ -445,6 +438,28 @@ export class Router {
     }
 
     /**
+     * @param {string} requestPath 
+     * @param {Array<string>} pathParameters 
+     * @returns {string | null} path as the spec key
+     */
+    retrievePathParameters(requestPath, pathParameters) {
+        let index = requestPath.lastIndexOf("/");
+        if(index == -1 || index == 0 || index == requestPath.length-1) {
+            return null;
+        }
+        pathParameters.push(requestPath.substring(index+1));
+        let _requestPath = requestPath.substring(0, index);
+        let pattern = _requestPath;
+        pathParameters.forEach(_ => pattern += "/{.+}");
+        let path = Object.keys(this.paths).find(path => new RegExp("^"+pattern+"$").test(path));
+        if(path != null) {
+            return path;
+        }else {
+            return this.retrievePathParameters(_requestPath, pathParameters);
+        }
+    }
+
+    /**
      * @param {*} value 
      * @param {Schema} spec 
      * @param {object} components 
@@ -470,7 +485,7 @@ export class Router {
                 return false;
             }
             if(spec.format == "date-time") {
-                if(!/^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$/.test(value)) {
+                if(!/^[0-9]{4}-[0-9]{2}-[0-9]{2}(T|t)[0-9]{2}:[0-9]{2}:[0-9]{2}(.[0-9]{3}|.[0-9]{6})*(Z|z|(\+|-)[0-9]{2}:[0-9]{2})$/.test(value)) {
                     return false;
                 }
             }else if(spec.format == "date") {
@@ -588,6 +603,26 @@ export class Router {
     }
 
     /**
+     * @returns {object}
+     */
+    get errorHeaders() {
+        let headers = {
+            "Access-Control-Allow-Origin": this.accessControl.allowOrigin,
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "no-store"
+        };
+        if(this.accessControl.httpsOnly) {
+            headers["Strict-Transport-Security"] = "Strict-Transport-Security: max-age=31536000; includeSubDomains";
+        }
+        if(this.customErrorHeaders != null) {
+            Object.keys(this.customErrorHeaders).forEach(key => {
+                headers[key] = this.customErrorHeaders[key];
+            });
+        }
+        return headers;
+    }
+
+    /**
      * @param {ServerResponse} response 
      * @param {object} data 
      */
@@ -668,8 +703,10 @@ export class Router {
             }
         }
         if(typeof statusCode == "number") {
-            let headers = this.headers;
-            headers["Content-Type"] = "text/plain";
+            let headers = this.errorHeaders;
+            if(headers["Content-Type"] === undefined) {
+                headers["Content-Type"] = "text/plain";
+            }
             response.writeHead(statusCode, headers);
         }
         if(message != null) {

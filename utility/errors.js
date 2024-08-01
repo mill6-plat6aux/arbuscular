@@ -15,11 +15,20 @@ export const ErrorCode = {
 }
 
 /**
+ * @deprecated Use ErrorResponse instead.
+ */
+export function error(code, message) {
+    let error = new Error(message);
+    error.name = code;
+    return error;
+}
+
+/**
  * @param {string} code 
  * @param {string} message 
  * @returns {Error}
  */
-export function error(code, message) {
+export function ErrorResponse(code, message) {
     let error = new Error(message);
     error.name = code;
     return error;

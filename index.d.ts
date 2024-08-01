@@ -3,6 +3,8 @@
  * Released under the MIT License.
  */
 
+import { IncomingMessage } from "http";
+
 /**
  * Authentication Function of the REST API
  * @param request HTTP request
@@ -30,7 +32,7 @@ export type handle = (session: any, request: any) => Promise<any>;
  * @param request HTTP request
  * @param settings Parsing setting
  */
-export async function parse(request: IncomingMessage, settings?: BodyParserSetting): Promise<any>;
+export function parse(request: IncomingMessage, settings?: BodyParserSetting): Promise<any>;
 
 export interface BodyParserSetting {
     formData: FormDataSetting;
@@ -44,6 +46,11 @@ export interface FormDataSetting {
 }
 
 /**
+ * @deprecated Use ErrorResponse instead.
+ */
+export function error(code: ErrorCode, message: string): Error;
+
+/**
  * If an exception is thrown by the REST API implementations, it returns an HTTP error based on the ErrorCode.
  *   JwtParseError : 400
  *   AuthenticationError : 401
@@ -52,7 +59,7 @@ export interface FormDataSetting {
  *   StateError : 403
  *   NotFoundError : 404
  */
-export function error(code: ErrorCode, message: string): Error;
+export function ErrorResponse(code: ErrorCode, message: string): Error;
 
 export class ErrorCode {
     static JwtParseError: string;

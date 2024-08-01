@@ -1,6 +1,6 @@
 {
   "name": "arbuscular",
-  "version": "0.9.20",
+  "version": "0.9.21",
   "description": "The ultra-lightweight API server 😋",
   "keywords": [
     "REST",
@@ -14,7 +14,7 @@
   "main": "index.js",
   "type": "module",
   "bin": {
-    "arbuscular": "./index.js"
+    "arbuscular": "./cli.js"
   },
   "scripts": {
     "test": "mocha --exit ./**/*.js"

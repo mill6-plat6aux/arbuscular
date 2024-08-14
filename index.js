@@ -3,6 +3,7 @@
  * Released under the MIT License.
  */
 
+export * from "./validator.js";
 export * from "./utility/body-parser.js";
 export * from "./utility/errors.js";
 export * from "./utility/files.js";

@@ -36,28 +36,15 @@
  * @property {object} customErrorHeaders
  */
 
-/**
- * @typedef {object} Schema
- * @property {"string"|"number"|"boolean"|"object"|"array"} [type]
- * @property {"date-time"|"date"|"time"|"byte"|"email"|"uuid"} [format]
- * @property {object} [properties]
- * @property {Schema} [items]
- * @property {Array<string>} [enum]
- * @property {Array<string>} [required]
- * @property {string} [$ref]
- * @property {Array<Schema>} [anyOf] Any of the schema of the child element
- * @property {Array<Schema>} [allOf] All of the schema of the child element
- * @property {Array<Schema>} [oneOf] One of the schema of the child element
- */
-
 import FileSystem from "fs";
 import Path from "path";
 import QueryString from "querystring";
 import YAML from "yaml";
+import { Validator } from "./validator.js";
 import { parse } from "./utility/body-parser.js";
 import { ErrorCode } from "./utility/errors.js";
 import { DownloadFile } from "./utility/files.js";
-import { LogLevel, writeError, writeLog } from "./utility/logger.js";
+import { LogLevel, writeLog, writeError } from "./utility/logger.js";
 
 export class Router {
     /**
@@ -142,13 +129,13 @@ export class Router {
         }
         if(setting.authentication != null && setting.authentication.module != null && setting.authentication.function != null) {
             import(Path.resolve(setting.authentication.module)).then(module => {
-                /** @type {import("./index").authenticate} */
+                /** @type {import("./index.d.ts").authenticate} */
                 this.authenticateFunction = module[setting.authentication.function];
             });
         }
         if(setting.authorization != null && setting.authorization.module != null && setting.authorization.function != null) {
             import(Path.resolve(setting.authorization.module)).then(module => {
-                /** @type {import("./index").authorize} */
+                /** @type {import("./index.d.ts").authorize} */
                 this.authorizeFunction = module[setting.authorization.function];
             });
         }
@@ -204,7 +191,8 @@ export class Router {
                 let result = await this.authenticateFunction(request);
                 this.sendJson(response, result);
             }catch(error) {
-                writeError(error.message+"\n"+error.stack);
+                writeError(error.message);
+                writeError(error.stack, LogLevel.debug);
                 this.sendError(response, error);
             }
             return;
@@ -288,8 +276,10 @@ export class Router {
                 requestSpec = spec.requestBody.content[requestContentType];
             }
             if(requestSpec != null && requestSpec.schema != null) {
-                if(!Router.validate(requestBody, requestSpec.schema, this.components)) {
-                    writeError(`The request differs from the interface definition.\n${request.method} ${requestPath}\nRequest:\n${JSON.stringify(requestBody, null, 4)}\nDefinition:\n${JSON.stringify(requestSpec.schema, null, 4)}`, LogLevel.error);
+                try {
+                    Validator.validate(requestBody, requestSpec.schema, this.components);
+                }catch(error) {
+                    writeError(`The request differs from the interface definition.\n${request.method} ${requestPath}\nRequest:\n${JSON.stringify(requestBody, null, 4)}\nDefinition:\n${JSON.stringify(requestSpec.schema, null, 4)}\n${error.message}`, LogLevel.error);
                     this.sendError(response, 400, "Request format is not supported.");
                     return;
                 }
@@ -372,7 +362,7 @@ export class Router {
             this.sendError(response, 404, "Not found.");
             return;
         }
-        /** @type {import("./index").handle} */
+        /** @type {import("./index.d.ts").handle} */
         let targetFunction = module[target.function];
         if(targetFunction == null) {
             this.sendError(response, 404, "Not found.");
@@ -382,7 +372,8 @@ export class Router {
         try {
             responseBody = await targetFunction.apply(null, [session, requestBody, request.headers, response]);
         }catch(error) {
-            writeError(error.message+"\n"+error.stack);
+            writeError(error.message);
+            writeError(error.stack, LogLevel.debug);
             this.sendError(response, error);
             return;
         }
@@ -401,9 +392,11 @@ export class Router {
                         }
                     }else {
                         if(responseSpec["application/json"] != null) {
-                            if(!Router.validate(responseBody, responseSpec["application/json"].schema, this.components)) {
+                            try {
+                                Validator.validate(responseBody, responseSpec["application/json"].schema, this.components);
+                            }catch(error) {
                                 this.sendError(response, 500, "Internal server error.");
-                                writeError(`The response differs from the interface definition.\n${request.method} ${requestPath}\nResponse:\n${JSON.stringify(responseBody, null, 4)}\nDefinition:\n${JSON.stringify(responseSpec["application/json"].schema, null, 4)}`);
+                                writeError(`The response differs from the interface definition.\n${request.method} ${requestPath}\nResponse:\n${JSON.stringify(responseBody, null, 4)}\nDefinition:\n${JSON.stringify(responseSpec["application/json"].schema, null, 4)}\n${error.message}`);
                                 return;
                             }
                             this.sendJson(response, responseBody);
@@ -457,129 +450,6 @@ export class Router {
         }else {
             return this.retrievePathParameters(_requestPath, pathParameters);
         }
-    }
-
-    /**
-     * @param {*} value 
-     * @param {Schema} spec 
-     * @param {object} components 
-     * @returns {boolean}
-     */
-    static validate(value, spec, components) {
-        if(spec.type == null && spec["$ref"] != null && components != null) {
-            let references = spec["$ref"].split("/");
-            let component;
-            references.forEach(reference => {
-                if(reference == "#" || reference == "components") return;
-                component = component == null ? components[reference] : component[reference];
-            });
-            if(component != null) {
-                spec = component;
-            }else {
-                writeError(`The component ${spec["$ref"]} is not specified.`);
-                return false;
-            }
-        }
-        if(spec.type == "string") {
-            if(typeof value != "string") {
-                return false;
-            }
-            if(spec.format == "date-time") {
-                if(!/^[0-9]{4}-[0-9]{2}-[0-9]{2}(T|t)[0-9]{2}:[0-9]{2}:[0-9]{2}(.[0-9]{3}|.[0-9]{6})*(Z|z|(\+|-)[0-9]{2}:[0-9]{2})$/.test(value)) {
-                    return false;
-                }
-            }else if(spec.format == "date") {
-                if(!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(value)) {
-                    return false;
-                }
-            }else if(spec.format == "byte") {
-                if(!/^[a-zA-Z0-9+/=]+$/.test(value)) {
-                    return false;
-                }
-            }else if(spec.format == "uuid") {
-                if(!/^[0-9A-F]{8}-[0-9A-F]{4}-[1-4]{1}[0-9A-F]{3}-[0-9A-F]{4}-[0-9A-F]{12}$/.test(value) && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-4]{1}[0-9a-f]{3}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(value)) {
-                    return false;
-                }
-            }
-            if(spec.enum != null) {
-                if(!spec.enum.includes(value)) {
-                    return false;
-                }
-            }
-        }else if(spec.type == "number") {
-            if(typeof value != "number") {
-                return false;
-            }
-        }else if(spec.type == "boolean") {
-            if(typeof value != "boolean") {
-                return false;
-            }
-        }else if(spec.type == "object") {
-            if(typeof value != "object" || value == null) {
-                return false;
-            }
-            if(spec.properties != null) {
-                let required = spec.required != null && Array.isArray(spec.required) ? spec.required : [];
-                let properties = spec.properties;
-                return Object.keys(properties).every(propertyName => {
-                    let childValue = value[propertyName];
-                    if(childValue === undefined) {
-                        if(required.includes(propertyName)) {
-                            writeError(`The property ${propertyName} is required.`);
-                            return false;
-                        }else {
-                            return true;
-                        }
-                    }
-                    let childSpec = properties[propertyName];
-                    let result = Router.validate(childValue, childSpec, components);
-                    if(!result && childSpec != "object" && childSpec != "array") {
-                        writeError(`The property ${propertyName} violates the definition.`);
-                    }
-                    return result;
-                });
-            }
-        }else if(spec.type == "array") {
-            if(!Array.isArray(value)) {
-                return false;
-            }
-            let elementSpec = spec.items;
-            return value.every(childValue => {
-                if(elementSpec == null) return false;
-                return Router.validate(childValue, elementSpec, components);
-            });
-        }else if(spec.type == "null") {
-            if(value != null) {
-                return false;
-            }
-        }else if(Array.isArray(spec.type)) {
-            /** @type {Array} */
-            let specs = spec.type;
-            return specs.some(type => {
-                let _spec = Object.assign({}, spec);
-                _spec.type = type;
-                return Router.validate(value, _spec, components);
-            });
-        }else if(spec.type == null) {
-            if(spec.anyOf != null && Array.isArray(spec.anyOf)) {
-                let specs = spec.anyOf;
-                return specs.some(childSpec => {
-                    return Router.validate(value, childSpec, components);
-                });
-            }else if(spec.allOf != null && Array.isArray(spec.allOf)) {
-                let specs = spec.allOf;
-                return specs.every(childSpec => {
-                    return Router.validate(value, childSpec, components);
-                });
-            }else if(spec.oneOf != null && Array.isArray(spec.oneOf)) {
-                let specs = spec.oneOf;
-                let result = specs.filter(childSpec => {
-                    return Router.validate(value, childSpec, components);
-                });
-                return result.length == 1;
-            }
-        }
-        return true;
     }
 
     /**
@@ -677,36 +547,41 @@ export class Router {
      * @param {string} [message] 
      */
     sendError(response, statusCode, message) {
+        let headers = this.errorHeaders;
+        if(typeof statusCode == "number") {
+            headers["Content-Type"] = "text/plain";
+        }
         if(typeof statusCode == "object" && statusCode instanceof Error) {
             let error = statusCode;
-            if(error.name == ErrorCode.AuthenticationError) {
-                statusCode = 401;
-                message = error.message;
-            }else if(error.name == ErrorCode.AuthorizationError) {
-                statusCode = 403;
-                message = error.message;
-            }else if(error.name == ErrorCode.JwtParseError) {
-                statusCode = 400;
-                message = error.message;
-            }else if(error.name == ErrorCode.RequestError) {
-                statusCode = 400;
-                message = error.message;
-            }else if(error.name == ErrorCode.StateError) {
-                statusCode = 403;
-                message = error.message;
-            }else if(error.name == ErrorCode.NotFoundError) {
-                statusCode = 404;
-                message = error.message;
+            if(error.name != null) {
+                if(error.name == ErrorCode.AuthenticationError) {
+                    statusCode = 401;
+                    message = error.message;
+                }else if(error.name == ErrorCode.AuthorizationError) {
+                    statusCode = 403;
+                    message = error.message;
+                }else if(error.name == ErrorCode.JwtParseError) {
+                    statusCode = 400;
+                    message = error.message;
+                }else if(error.name == ErrorCode.RequestError) {
+                    statusCode = 400;
+                    message = error.message;
+                }else if(error.name == ErrorCode.StateError) {
+                    statusCode = 403;
+                    message = error.message;
+                }else if(error.name == ErrorCode.NotFoundError) {
+                    statusCode = 404;
+                    message = error.message;
+                }else {
+                    statusCode = 500;
+                    message = "An error has occurred on the server. Please contact the administrator.";
+                }
             }else {
                 statusCode = 500;
                 message = "An error has occurred on the server. Please contact the administrator.";
             }
         }
         if(typeof statusCode == "number") {
-            let headers = this.errorHeaders;
-            if(headers["Content-Type"] === undefined) {
-                headers["Content-Type"] = "text/plain";
-            }
             response.writeHead(statusCode, headers);
         }
         if(message != null) {

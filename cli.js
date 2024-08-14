@@ -16,9 +16,10 @@ import { readFileSync } from "fs";
 import YAML from "yaml";
 import Http from "http";
 import { Router } from "./router.js";
-import { writeError } from "./utility/logger.js";
+import { setLogSettingFilePath, writeError } from "./utility/logger.js";
 
 let settingFilePath = "arbuscular.yaml";
+let logSettingFilePath = "log.yaml";
 
 if(process.argv.length > 2) {
     let args = process.argv;
@@ -34,10 +35,14 @@ if(process.argv.length > 2) {
             if(value == null) continue;
             if(key == "setting") {
                 settingFilePath = value;
+            }else if(key == "log") {
+                logSettingFilePath = value;
             }
         }
     }
 }
+
+setLogSettingFilePath(logSettingFilePath);
 
 let settingFile = readFileSync(settingFilePath, "utf8");
 let setting = YAML.parse(settingFile);

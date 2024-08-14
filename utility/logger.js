@@ -8,6 +8,13 @@
 import FileSystem from "fs";
 import YAML from "yaml";
 
+let logSettingFilePath = "log.yaml";
+
+export function setLogSettingFilePath(filePath) {
+    logSettingFilePath = filePath;
+    loadSetting();
+}
+
 export const LogLevel = {
     debug: 1,
     info: 2,
@@ -25,8 +32,13 @@ let _writeError = (message) => {
     process.stderr.write(message);
 }
 
-if(FileSystem.existsSync("log.yaml")) {
-    let settings = YAML.parse(FileSystem.readFileSync("log.yaml", "utf8"));
+loadSetting();
+
+function loadSetting() {
+    if(!FileSystem.existsSync(logSettingFilePath)) {
+        return;
+    }
+    let settings = YAML.parse(FileSystem.readFileSync(logSettingFilePath, "utf8"));
     if(settings.threshold != null && typeof settings.threshold == "string") {
         if(settings.threshold == "debug") {
             threshold = LogLevel.debug;

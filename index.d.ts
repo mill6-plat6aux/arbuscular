@@ -4,6 +4,8 @@
  */
 
 import { IncomingMessage } from "http";
+import { JsonSchema } from "./json-schema.d.ts";
+import { Components } from "./openapi3.1.d.ts";
 
 /**
  * Authentication Function of the REST API
@@ -68,4 +70,25 @@ export class ErrorCode {
     static RequestError: string;
     static StateError: string;
     static NotFoundError: string;
+}
+
+export function writeLog(message: string, logLevel?: number, force?: boolean);
+export function writeError(message: string, logLevel?: number, force?: boolean);
+
+export class LogLevel {
+    static debug: number;
+    static info: number;
+    static warning: number;
+    static error: number;
+    static critical: number;
+}
+
+export class Validator {
+    /**
+     * Use this method when dynamically verifying conformance to the OpenAPI specification or JSON schema.
+     * @param value target object
+     * @param spec JSON Schema (Part of the OpenAPI specification)
+     * @param components Component definition of OpenAPI specification
+     */
+    static validate(value: any, spec: JsonSchema, components: Components): void;
 }

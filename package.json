@@ -1,6 +1,6 @@
 {
   "name": "arbuscular",
-  "version": "0.9.23",
+  "version": "0.9.24",
   "description": "The ultra-lightweight API server 😋",
   "keywords": [
     "REST",
@@ -21,7 +21,9 @@
   },
   "files": [
     "index.js",
+    "cli.js",
     "router.js",
+    "validator.js",
     "utility",
     "index.d.ts"
   ],

@@ -162,8 +162,6 @@ export class Router {
             return;
         }
 
-        writeLog(`${request.method} ${request.url}`, LogLevel.info);
-
         let requestPath = request.url.substring(this.contextPath.length);
 
         // retrieve query parameters
@@ -186,6 +184,8 @@ export class Router {
         // retrieve auth spec
         let authSpec = this.authPaths.find(authPath => requestPath == authPath.url);
         if(authSpec != null && this.authenticateFunction != null) {
+            writeLog(`${request.method} ${request.url}`, LogLevel.info);
+
             // authentication
             try {
                 let result = await this.authenticateFunction(request);
@@ -236,11 +236,14 @@ export class Router {
             try {
                 session = await this.authorizeFunction(request);
             }catch(error) {
+                writeLog(`${request.method} ${request.url}`, LogLevel.info);
                 writeError(error.message+"\n"+error.stack);
                 this.sendError(response, error);
                 return;
             }
         }
+
+        writeLog(`${request.method} ${request.url} ${session != null ? JSON.stringify(session) : ""}`, LogLevel.info);
 
         // retrieve routing target
         let target;

@@ -3,7 +3,7 @@
  * Released under the MIT License.
  */
 
-import { IncomingMessage } from "http";
+import { IncomingMessage, IncomingHttpHeaders, ServerResponse } from "http";
 import { JsonSchema } from "./json-schema.d.ts";
 import { Components } from "./openapi3.1.d.ts";
 
@@ -24,10 +24,12 @@ export type authorize = (request: IncomingMessage) => Promise<any>;
 /**
  * Functions as REST API implementations
  * @param session Session object returned from authorization functions (e.g., containing user IDs, etc.)
- * @param request REST API parameters (HTTP body, query parameters, path parameters)
- * @returns  Return value of REST API (HTTP body) 
+ * @param request REST API parameters (HTTP request body, query parameters, path parameters)
+ * @param requestHeaders HTTP request headers
+ * @param response HTTP response
+ * @returns  Return values of REST API (HTTP response body) 
  */
-export type handle = (session: any, request: any) => Promise<any>;
+export type handle = (session: any, requestBody: any, requestHeaders?: IncomingHttpHeaders, response?: ServerResponse) => Promise<any>;
 
 /**
  * Parses HTTP requests and converts them to JSON objects.

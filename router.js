@@ -338,11 +338,11 @@ export class Router {
                     return;
                 }
             }else if(pathParameters.length > 0) {
+                requestBody = {};
                 pathParameters.forEach((pathParameter, index) => {
                     if(index < spec.parameters.length && spec.parameters[index].in == "path") {
                         let key = spec.parameters[index].name;
                         let type = spec.parameters[index].schema.type;
-                        requestBody = {};
                         if(type == "number" || type == "integer") {
                             requestBody[key] = Number(pathParameter);
                         }else if(type == "boolean") {

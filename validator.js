@@ -144,7 +144,7 @@ export class Validator {
                         errors.push(error);
                     }
                 });
-                if(errors.length != specs.length-1) {
+                if(errors.length > 0 && errors.length != specs.length-1) {
                     throw new Error(errors.map(error => error.message).join("\n"));
                 }
             }

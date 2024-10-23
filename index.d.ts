@@ -94,3 +94,19 @@ export class Validator {
      */
     static validate(value: any, spec: JsonSchema, components: Components): void;
 }
+
+export class UploadFile {
+    data: Buffer;
+    /** MIME Types */
+    dataType: String;
+    fileName: String;
+}
+
+export class DownloadFile {
+    /**
+     * @param data 
+     * @param dataType MIME Types
+     * @param fileName 
+     */
+    constructor(data: Buffer, dataType: String, fileName: String | null);
+}

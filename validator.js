@@ -69,6 +69,7 @@ export class Validator {
                         if(required.includes(propertyName)) {
                             throw new Error(`The property ${propertyName} is required.`);
                         }
+                        return;
                     }
                     let childSpec = properties[propertyName];
                     try {

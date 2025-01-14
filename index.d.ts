@@ -3,7 +3,7 @@
  * Released under the MIT License.
  */
 
-import { IncomingMessage, IncomingHttpHeaders, ServerResponse } from "http";
+import { IncomingMessage, IncomingHttpHeaders, ServerResponse, Server } from "http";
 import { JsonSchema } from "./json-schema.d.ts";
 import { Components } from "./openapi3.1.d.ts";
 
@@ -110,3 +110,5 @@ export class DownloadFile {
      */
     constructor(data: Buffer, dataType: String, fileName: String | null);
 }
+
+export function extendServer(server: Server);

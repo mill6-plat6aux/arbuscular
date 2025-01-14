@@ -13,6 +13,7 @@
  */
 
 import { readFileSync } from "fs";
+import Path from "path";
 import YAML from "yaml";
 import Http from "http";
 import { Router } from "./router.js";
@@ -107,4 +108,15 @@ const server = Http.createServer((request, response) => {
 server.on("listening", () => {
     console.log(`Arbuscular is listening on ${setting.port}.`);
 });
+
+if(setting.extensions != null) {
+    setting.extensions.forEach(extension => {
+        import(Path.resolve(extension)).then(extension => {
+            if(extension["extendServer"] != null && typeof extension["extendServer"] == "function") {
+                extension["extendServer"](server);
+            }
+        });
+    });
+}
+
 server.listen(setting.port);

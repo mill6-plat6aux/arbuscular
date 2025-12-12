@@ -24,19 +24,20 @@ export type authorize = (request: IncomingMessage) => Promise<any>;
 /**
  * Functions as REST API implementations
  * @param session Session object returned from authorization functions (e.g., containing user IDs, etc.)
- * @param request REST API parameters (HTTP request body, query parameters, path parameters)
- * @param requestHeaders HTTP request headers
+ * @param requestBody REST API parameters (HTTP request body, query parameters, path parameters)
+ * @param requestHeader HTTP request headers
+ * @param requestRaw HTTP request raw data
  * @param response HTTP response
  * @returns  Return values of REST API (HTTP response body) 
  */
-export type handle = (session: any, requestBody: any, requestHeaders?: IncomingHttpHeaders, response?: ServerResponse) => Promise<any>;
+export type handle = (session: any, requestBody: any, requestHeader?: IncomingHttpHeaders, requestRaw?: Buffer|null, response?: ServerResponse) => Promise<any>;
 
 /**
  * Parses HTTP requests and converts them to JSON objects.
  * @param request HTTP request
  * @param settings Parsing setting
  */
-export function parse(request: IncomingMessage, settings?: BodyParserSetting): Promise<any>;
+export function parse(request: IncomingMessage, settings?: BodyParserSetting): Promise<BodyParserResult|null>;
 
 export interface BodyParserSetting {
     formData: FormDataSetting;
@@ -47,6 +48,11 @@ export interface FormDataSetting {
      * MIME types that accepts requests.
      */
     validTypes: Array<string>;
+}
+
+export interface BodyParserResult {
+    data: any;
+    raw: Buffer|null;
 }
 
 /**

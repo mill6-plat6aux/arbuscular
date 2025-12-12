@@ -4,92 +4,42 @@
  * Created by Takuro Okada
  */
 
-import { ok, equal } from "assert";
-import { parse } from "../utility/body-parser.js"
+import { ok, equal, rejects } from "assert";
 import { Readable } from "stream";
-import { UploadFile } from "../utility/files.js";
 import { Router } from "../router.js";
 
-describe("Router", () => {
-    let router;
-    before(() => {
-        router = new Router({
-            contextPath: "",
-            interface: {
-                paths: {
-                    "/test": {
-                        "get": {
-                            security: [
-                                {
-                                    BearerAuth: []
-                                }
-                            ],
-                            parameters: [
-                                {
-                                    schema:{
-                                        type: "string"
-                                    },
-                                    in: "query",
-                                    name: "param1"
-                                }
-                            ],
-                            responses: {
-                                "200": {
-                                    content: {
-                                        "application/json": {
-                                            schema: {
-                                                type: "object",
-                                                properties: {
-                                                    "key1": {
-                                                        type: "string"
-                                                    },
-                                                    "key2": {
-                                                        type: "string"
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        "post": {
-                            security: [
-                                {
-                                    BearerAuth: []
-                                }
-                            ],
-                            requestBody: {
-                                content: {
-                                    "application/json": {
-                                        schema: {
-                                            type: "object",
-                                            properties: {
-                                                "key1": {
-                                                    type: "string"
-                                                },
-                                                "key2": {
-                                                    type: "string"
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
+let router = new Router({
+    contextPath: "",
+    interface: {
+        paths: {
+            "/test": {
+                "get": {
+                    security: [
+                        {
+                            BearerAuth: []
+                        }
+                    ],
+                    parameters: [
+                        {
+                            schema:{
+                                type: "string"
                             },
-                            responses: {
-                                "200": {
-                                    content: {
-                                        "application/json": {
-                                            schema: {
-                                                type: "object",
-                                                properties: {
-                                                    "key1": {
-                                                        type: "string"
-                                                    },
-                                                    "key2": {
-                                                        type: "string"
-                                                    }
-                                                }
+                            in: "query",
+                            name: "param1"
+                        }
+                    ],
+                    responses: {
+                        "200": {
+                            content: {
+                                "application/json": {
+                                    schema: {
+                                        type: "object",
+                                        properties: {
+                                            "key1": {
+                                                type: "string"
+                                            },
+                                            "key2": {
+                                                type: "string"
                                             }
                                         }
                                     }
@@ -98,47 +48,119 @@ describe("Router", () => {
                         }
                     }
                 },
-                components: {
-                    securitySchemes: {
-                        "BearerAuth": {
-                            type: "oauth2",
-                            flows: {
-                                clientCredentials: {
-                                    tokenUrl: "/token"
+                "post": {
+                    security: [
+                        {
+                            BearerAuth: []
+                        }
+                    ],
+                    requestBody: {
+                        content: {
+                            "application/json": {
+                                schema: {
+                                    type: "object",
+                                    properties: {
+                                        "key1": {
+                                            type: "string"
+                                        },
+                                        "key2": {
+                                            type: "string"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    responses: {
+                        "200": {
+                            content: {
+                                "application/json": {
+                                    schema: {
+                                        type: "object",
+                                        properties: {
+                                            "key1": {
+                                                type: "string"
+                                            },
+                                            "key2": {
+                                                type: "string"
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            },
-            route: {
-                "/test": {
-                    "GET": {
-                        module: "./test/router.js",
-                        function: "testGet"
-                    },
-                    "POST": {
-                        module: "./test/router.js",
-                        function: "testPost"
+            }
+        },
+        components: {
+            securitySchemes: {
+                "BearerAuth": {
+                    type: "oauth2",
+                    flows: {
+                        clientCredentials: {
+                            tokenUrl: "/token"
+                        }
                     }
                 }
-            },
-            authentication: {
-                module: "./test/router.js",
-                function: "authenticate"
-            },
-            authorization: {
-                module: "./test/router.js",
-                function: "authorize"
-            },
-            accessControl: {
-                allowOrigin: "*",
-                allowHeaders: "Content-Type, Authorization",
-                allowMethods: "GET, POST, PUT, DELETE"
             }
-        });
+        }
+    },
+    route: {
+        "/test": {
+            "GET": {
+                module: "./test/router.js",
+                function: "testGet"
+            },
+            "POST": {
+                module: "./test/router.js",
+                function: "testPost"
+            }
+        }
+    },
+    authentication: {
+        module: "./test/router.js",
+        function: "authenticate"
+    },
+    authorization: {
+        module: "./test/router.js",
+        function: "authorize"
+    },
+    accessControl: {
+        allowOrigin: "*",
+        allowHeaders: "Content-Type, Authorization",
+        allowMethods: "GET, POST, PUT, DELETE"
+    }
+});
+
+export async function authenticate() {
+    return {access_token: "TOKEN", token_type: "Bearer"};
+}
+
+export async function authorize() {
+    return {userId: 1, companyId: 1};
+}
+
+export async function testGet(session, request) {
+    return {key1: session.userId.toString(), key2: request.param1};
+}
+
+export async function testPost(session, request) {
+    return {key1: request.key1, key2: request.key2};
+}
+
+setTimeout(() => {
+    Promise.all([
+        test1(),
+        test2()
+    ]).then(() => {
+        console.log("Testing completed.");
     });
-    it("route GET request", (done) => {
+}, 0);
+
+function test1() {
+    console.log("route GET request");
+    return new Promise((resolve, reject) => {
         let request = {
             url: "/test?param1=param1Value",
             method: "GET",
@@ -156,11 +178,15 @@ describe("Router", () => {
                 equal(response.key2, "param1Value");
             },
             end: () => {
-                done();
+                resolve();
             }
         });
     });
-    it("route POST request", (done) => {
+}
+
+function test2() {
+    console.log("route POST request");
+    return new Promise((resolve, reject) => {
         let request = Readable.from(Buffer.from(JSON.stringify({key1: "value1", key2: "value2"})));
         request.url = "/test";
         request.method = "POST";
@@ -178,24 +204,8 @@ describe("Router", () => {
                 equal(response.key2, "value2");
             },
             end: () => {
-                done();
+                resolve();
             }
         });
     });
-});
-
-export async function authenticate() {
-    return {access_token: "TOKEN", token_type: "Bearer"};
-}
-
-export async function authorize() {
-    return {userId: 1, companyId: 1};
-}
-
-export async function testGet(session, request) {
-    return {key1: session.userId.toString(), key2: request.param1};
-}
-
-export async function testPost(session, request) {
-    return {key1: request.key1, key2: request.key2};
 }

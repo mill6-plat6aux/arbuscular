@@ -10,6 +10,9 @@ import YAML from "yaml";
 
 let logSettingFilePath = "log.yaml";
 
+/**
+ * @param {string} filePath 
+ */
 export function setLogSettingFilePath(filePath) {
     logSettingFilePath = filePath;
     loadSetting();
@@ -25,9 +28,16 @@ export const LogLevel = {
 
 let threshold = 2;
 
+/**
+ * @param {string} message 
+ */
 let _writeLog = (message) => {
     process.stdout.write(message);
 }
+
+/**
+ * @param {string} message 
+ */
 let _writeError = (message) => {
     process.stderr.write(message);
 }

@@ -32,8 +32,8 @@
  * @property {Module} authentication
  * @property {Module} authorization 
  * @property {AccessControl} accessControl
- * @property {object} customHeaders
- * @property {object} customErrorHeaders
+ * @property {any} customHeaders
+ * @property {any} customErrorHeaders
  */
 
 import FileSystem from "fs";
@@ -53,6 +53,7 @@ export class Router {
     constructor(setting) {
         this.contextPath = setting.contextPath;
         this.spec;
+        /** @type {Array<any>} */
         this.authPaths = [];
         this.authenticateFunction;
         this.authorizeFunction;
@@ -80,7 +81,9 @@ export class Router {
         }
         this.accessControl = setting.accessControl;
 
+        /** @type {any} */
         this.customHeaders = setting.customHeaders;
+        /** @type {any} */
         this.customErrorHeaders = setting.customErrorHeaders;
 
         if(setting.interface != null) {
@@ -165,6 +168,7 @@ export class Router {
         let requestPath = request.url.substring(this.contextPath.length);
 
         // retrieve query parameters
+        /** @type {any} */
         let queryParameters;
         if(requestPath.includes("?")) {
             let index = requestPath.indexOf("?");
@@ -190,7 +194,7 @@ export class Router {
             try {
                 let result = await this.authenticateFunction(request);
                 this.sendJson(response, result);
-            }catch(error) {
+            }catch(/** @type {any} */error) {
                 writeError(error.message);
                 writeError(error.stack, LogLevel.debug);
                 this.sendError(response, error);
@@ -202,6 +206,7 @@ export class Router {
         let spec = this.paths[requestPath];
 
         let pathWithPathParameters;
+        /** @type {Array<string>} */
         let pathParameters = [];
         if(spec == null) {
             pathWithPathParameters = this.retrievePathParameters(requestPath, pathParameters);
@@ -235,7 +240,7 @@ export class Router {
         if(spec.security != null && this.authorizeFunction != null) {
             try {
                 session = await this.authorizeFunction(request);
-            }catch(error) {
+            }catch(/** @type {any} */error) {
                 writeLog(`${request.method} ${request.url}`, LogLevel.info);
                 writeError(error.message+"\n"+error.stack);
                 this.sendError(response, error);
@@ -265,6 +270,7 @@ export class Router {
         }
 
         let requestBody;
+        let requesRaw = null;
 
         // validate request
         if(spec.requestBody != null && spec.requestBody.content != null) {
@@ -272,7 +278,11 @@ export class Router {
             if(target != null && target.validTypes != null) {
                 parseSettings = {formData: target.validTypes};
             }
-            requestBody = await parse(request, parseSettings);
+            let parsedData = await parse(request, parseSettings);
+            if(parsedData != null) {
+                requestBody = parsedData.data;
+                requesRaw = parsedData.raw;
+            }
 
             let requestSpec;
             if(requestContentType != null) {
@@ -281,7 +291,7 @@ export class Router {
             if(requestSpec != null && requestSpec.schema != null) {
                 try {
                     Validator.validate(requestBody, requestSpec.schema, this.components);
-                }catch(error) {
+                }catch(/** @type {any} */error) {
                     writeError(`The request differs from the interface definition.\n${request.method} ${requestPath}\nRequest:\n${JSON.stringify(requestBody, null, 4)}\nDefinition:\n${JSON.stringify(requestSpec.schema, null, 4)}\n${error.message}`, LogLevel.error);
                     this.sendError(response, 400, "Request format is not supported.");
                     return;
@@ -306,7 +316,7 @@ export class Router {
         }else if(spec.parameters != null) {
             if(queryParameters != null) {
                 requestBody = {};
-                let result = spec.parameters.every(parameterSpec => {
+                let result = spec.parameters.every((/** @type {any} */parameterSpec) => {
                     if(parameterSpec.in != "query") {
                         return true;
                     }
@@ -373,8 +383,8 @@ export class Router {
         }
         let responseBody;
         try {
-            responseBody = await targetFunction.apply(null, [session, requestBody, request.headers, response]);
-        }catch(error) {
+            responseBody = await targetFunction.apply(null, [session, requestBody, request.headers, requesRaw, response]);
+        }catch(/** @type {any} */error) {
             writeError(error.message);
             writeError(error.stack, LogLevel.debug);
             this.sendError(response, error);
@@ -397,7 +407,7 @@ export class Router {
                         if(responseSpec["application/json"] != null) {
                             try {
                                 Validator.validate(responseBody, responseSpec["application/json"].schema, this.components);
-                            }catch(error) {
+                            }catch(/** @type {any} */error) {
                                 this.sendError(response, 500, "Internal server error.");
                                 writeError(`The response differs from the interface definition.\n${request.method} ${requestPath}\nResponse:\n${JSON.stringify(responseBody, null, 4)}\nDefinition:\n${JSON.stringify(responseSpec["application/json"].schema, null, 4)}\n${error.message}`);
                                 return;
@@ -456,9 +466,10 @@ export class Router {
     }
 
     /**
-     * @returns {object}
+     * @returns {any}
      */
     get headers() {
+        /** @type {any} */
         let headers = {
             "Access-Control-Allow-Origin": this.accessControl.allowOrigin,
             "X-Content-Type-Options": "nosniff",
@@ -468,7 +479,7 @@ export class Router {
             headers["Strict-Transport-Security"] = "Strict-Transport-Security: max-age=31536000; includeSubDomains";
         }
         if(this.customHeaders != null) {
-            Object.keys(this.customHeaders).forEach(key => {
+            Object.keys(this.customHeaders).forEach((/** @type {string} */key) => {
                 headers[key] = this.customHeaders[key];
             });
         }
@@ -476,9 +487,10 @@ export class Router {
     }
 
     /**
-     * @returns {object}
+     * @returns {any}
      */
     get errorHeaders() {
+        /** @type {any} */
         let headers = {
             "Access-Control-Allow-Origin": this.accessControl.allowOrigin,
             "X-Content-Type-Options": "nosniff",
@@ -488,7 +500,7 @@ export class Router {
             headers["Strict-Transport-Security"] = "Strict-Transport-Security: max-age=31536000; includeSubDomains";
         }
         if(this.customErrorHeaders != null) {
-            Object.keys(this.customErrorHeaders).forEach(key => {
+            Object.keys(this.customErrorHeaders).forEach((/** @type {string} */key) => {
                 headers[key] = this.customErrorHeaders[key];
             });
         }
@@ -525,6 +537,7 @@ export class Router {
     
     /**
      * @param {ServerResponse} response 
+     * @param {string} text 
      */
     sendText(response, text) {
         let headers = this.headers;

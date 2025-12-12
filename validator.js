@@ -8,17 +8,24 @@
 export class Validator {
 
     /**
-     * @param {*} value 
+     * @param {any} value 
      * @param {import("./json-schema.d.ts").JsonSchema} spec 
      * @param {import("./openapi3.1.d.ts").Components} components 
      */
     static validate(value, spec, components) {
         if(spec.type == null && spec["$ref"] != null && components != null) {
+            /** @type {Array<string>} */
             let references = spec["$ref"].split("/");
+            /** @type {any} */
             let component;
             references.forEach(reference => {
                 if(reference == "#" || reference == "components") return;
-                component = component == null ? components[reference] : component[reference];
+                if(components.schemas == null) return;
+                if(component == null && components.schemas != null) {
+                    component = components.schemas[reference];
+                }else if(component != null) {
+                    component = component[reference];
+                }
             });
             if(component != null) {
                 spec = component;
@@ -74,7 +81,7 @@ export class Validator {
                     let childSpec = properties[propertyName];
                     try {
                         Validator.validate(childValue, childSpec, components);
-                    }catch(error) {
+                    }catch(/** @type {any} */error) {
                         throw new Error(`The value [${childValue}] of the property [${propertyName}] differs from the definition. ${error.message}`);
                     }
                 });
@@ -86,15 +93,15 @@ export class Validator {
             let elementSpec = spec.items;
             return value.every(childValue => {
                 if(elementSpec == null) return false;
-                return Validator.validate(childValue, elementSpec, components);
+                Validator.validate(childValue, elementSpec, components);
             });
         }else if(spec.type == "null") {
             if(value != null) {
                 throw new Error(`The data type is different from the definition [${spec.type}].`);
             }
         }else if(Array.isArray(spec.type)) {
-            /** @type {Array} */
             let specs = spec.type;
+            /** @type {Array<any>} */
             let errors = [];
             specs.forEach(type => {
                 let _spec = Object.assign({}, spec);
@@ -111,6 +118,7 @@ export class Validator {
         }else if(spec.type == null) {
             if(spec.anyOf != null && Array.isArray(spec.anyOf)) {
                 let specs = spec.anyOf;
+                /** @type {Array<any>} */
                 let errors = [];
                 specs.forEach(childSpec => {
                     try {
@@ -124,6 +132,7 @@ export class Validator {
                 }
             }else if(spec.allOf != null && Array.isArray(spec.allOf)) {
                 let specs = spec.allOf;
+                /** @type {Array<any>} */
                 let errors = [];
                 specs.forEach(childSpec => {
                     try {
@@ -137,6 +146,7 @@ export class Validator {
                 }
             }else if(spec.oneOf != null && Array.isArray(spec.oneOf)) {
                 let specs = spec.oneOf;
+                /** @type {Array<any>} */
                 let errors = [];
                 specs.forEach(childSpec => {
                     try {

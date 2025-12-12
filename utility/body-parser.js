@@ -26,9 +26,7 @@ import { UploadFile } from "./files.js";
  */
 
 /**
- * @param {IncomingMessage} request
- * @param {BodyParserSetting} [settings]
- * @returns {Promise<object>}
+ * @type {import("../index.d.ts").parse}
  */
 export async function parse(request, settings) {
     let contentType = request.headers["content-type"];
@@ -46,7 +44,8 @@ export async function parse(request, settings) {
             contentType = contentType.substring(0, delimiterIndex);
         }
     }
-    let body;
+    /** @type {import("../index.js").BodyParserResult|null} */
+    let body = null;
     if(contentType == "application/json" || 
     contentType == "application/cloudevents+json") {
         try {
@@ -57,7 +56,7 @@ export async function parse(request, settings) {
     }else if(contentType == "multipart/form-data") {
         try {
             body = await parseFormData(request, settings);
-        }catch(error) {
+        }catch(/** @type {any} */error) {
             throw new Error("The file format you specify is not supported. "+error.message);
         }
     }else {
@@ -69,6 +68,7 @@ export async function parse(request, settings) {
             let url = new URL(request.url, "http://"+request.headers.host);
             let parameters = url.searchParams;
             if(parameters != null) {
+                /** @type {any} */
                 let fields = {};
                 parameters.forEach((value, name) => {
                     if(/^[0-9.]+$/.test(value)) {
@@ -77,17 +77,18 @@ export async function parse(request, settings) {
                         fields[name] = value;
                     }
                 });
-                body = fields;
+                body = {data: fields, raw: null};
             }
         }else {
             body = await parseUrlEncoded(request);
             if(body != null) {
-                Object.keys(body).forEach(key => {
-                    let value = body[key];
+                let data = body.data;
+                Object.keys(data).forEach(key => {
+                    let value = data[key];
                     if(/^[0-9.]+$/.test(value)) {
-                        body[key] = Number(value);
+                        data[key] = Number(value);
                     }else {
-                        body[key] = value;
+                        data[key] = value;
                     }
                 });
             }
@@ -99,24 +100,26 @@ export async function parse(request, settings) {
 /**
  * @param {string} charset 
  * @param {IncomingMessage} request 
+ * @returns {Promise<import("../index.js").BodyParserResult|null>}
  */
 async function parseJson(charset, request) {
     return new Promise((resolve, reject) => {
         let textDecoder = new TextDecoder(charset);
-        let inputData;
+        /** @type {Buffer|null} */
+        let buffer;
         request.on("data", data => {
-            if(inputData == undefined) {
-                inputData = data;
+            if(buffer == undefined) {
+                buffer = data;
             }else {
-                inputData = Buffer.concat([inputData, data]);
+                buffer = Buffer.concat([buffer, data]);
             }
         });
-        request.on("end", data => {
-            if(inputData == undefined) {
+        request.on("end", () => {
+            if(buffer == undefined) {
                 resolve(null);
                 return;
             }
-            let text = textDecoder.decode(inputData);
+            let text = textDecoder.decode(buffer);
             let json;
             try{
                 json = JSON.parse(text);
@@ -124,7 +127,7 @@ async function parseJson(charset, request) {
                 reject(error);
                 return;
             }
-            resolve(json);
+            resolve({data: json, raw: buffer});
         });
         request.on("error", error => {
             reject(error);
@@ -135,11 +138,13 @@ async function parseJson(charset, request) {
 /**
  * @param {IncomingMessage} request 
  * @param {BodyParserSetting} [settings]
+ * @returns {Promise<import("../index.js").BodyParserResult|null>}
  */
 function parseFormData(request, settings) {
     return new Promise((resolve, reject) => {
         let formDataTypes = (settings != null && settings.formData != null) ? settings.formData.validTypes : null;
         var busboy = Busboy({headers: request.headers});
+        /** @type {any} */
         let fields = {};
         busboy.on("file", (fieldname, file, info) => {
             if(info == null) {
@@ -150,6 +155,7 @@ function parseFormData(request, settings) {
                 reject(new Error("Invalid mime type: "+info.mimeType));
                 return;
             }
+            /** @type {Buffer|null} */
             let buffer = null;
             file.on("data", (data) => {
                 if(buffer == null) {
@@ -159,18 +165,22 @@ function parseFormData(request, settings) {
                 }
             });
             file.on("end", () => {
-                fields[fieldname] = new UploadFile(buffer, info.mimeType, info.filename);
+                if(buffer != null) {
+                    fields[fieldname] = new UploadFile(buffer, info.mimeType, info.filename);
+                }else {
+                    fields[fieldname] = null;
+                }
             });
         });
-        busboy.on("field", function(fieldname, val, fieldnameTruncated, valTruncated, encoding, mimetype) {
-            if(/^[0-9.]+$/.test(val)) {
-                fields[fieldname] = Number(val);
+        busboy.on("field", /** @type {(name: string, value: string, info: import("busboy").FieldInfo) => void} */function(name, value, info) {
+            if(/^[0-9.]+$/.test(value)) {
+                fields[name] = Number(value);
             }else {
-                fields[fieldname] = val;
+                fields[name] = value;
             }
         });
         busboy.on("finish", () => {
-            resolve(fields);
+            resolve({data: fields, raw: null});
         });
         request.pipe(busboy);
     });
@@ -178,24 +188,26 @@ function parseFormData(request, settings) {
 
 /**
  * @param {IncomingMessage} request 
+ * @returns {Promise<import("../index.js").BodyParserResult|null>}
  */
 function parseUrlEncoded(request) {
     return new Promise((resolve, reject) => {
-        let inputData;
+        /** @type {Buffer|null} */
+        let buffer;
         request.on("data", data => {
-            if(inputData == undefined) {
-                inputData = data;
+            if(buffer == undefined) {
+                buffer = data;
             }else {
-                inputData = Buffer.concat([inputData, data]);
+                buffer = Buffer.concat([buffer, data]);
             }
         });
-        request.on("end", data => {
-            if(inputData == undefined) {
+        request.on("end", () => {
+            if(buffer == undefined) {
                 resolve(null);
                 return;
             }
-            let body = querystring.parse(inputData.toString("utf8"));
-            resolve(body);
+            let body = querystring.parse(buffer.toString("utf8"));
+            resolve({data: body, raw: buffer});
         });
     });
 }

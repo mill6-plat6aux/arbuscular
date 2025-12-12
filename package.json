@@ -1,6 +1,6 @@
 {
   "name": "arbuscular",
-  "version": "0.9.30",
+  "version": "0.9.31",
   "description": "The ultra-lightweight API server 😋",
   "keywords": [
     "REST",
@@ -29,10 +29,6 @@
   ],
   "dependencies": {
     "busboy": "^1.6.0",
-    "uuid": "^9.0.0",
-    "yaml": "^2.3.1"
-  },
-  "devDependencies": {
-    "mocha": "^10.2.0"
+    "yaml": "^2.8.2"
   }
 }

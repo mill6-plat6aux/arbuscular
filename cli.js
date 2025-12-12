@@ -48,9 +48,9 @@ setLogSettingFilePath(logSettingFilePath);
 let settingFile = readFileSync(settingFilePath, "utf8");
 let setting = YAML.parse(settingFile);
 
-let interfaces = setting.interfaces.map(interfaceSpec => {
+let interfaces = setting.interfaces.map((/** @type {any} */interfaceSpec) => {
     return {contextPath: interfaceSpec.contextPath, router: new Router(interfaceSpec)};
-}).sort((entry1, entry2) => {
+}).sort((/** @type {any} */entry1, /** @type {any} */entry2) => {
     let length1 = entry1.contextPath.length;
     let length2 = entry2.contextPath.length;
     return length1 < length2 ? 1 : (length1 > length2 ? -1 : 0);
@@ -79,7 +79,7 @@ const server = Http.createServer((request, response) => {
         response.end();
         return;
     }
-    let interfaceSpec = interfaces.find(interfaceSpec => {
+    let interfaceSpec = interfaces.find((/** @type {any} */interfaceSpec) => {
         return requestPath == interfaceSpec.contextPath || 
             (requestPath.startsWith(interfaceSpec.contextPath) && 
             requestPath.substring(interfaceSpec.contextPath.length).startsWith("/"));
@@ -98,6 +98,7 @@ const server = Http.createServer((request, response) => {
     let router = interfaceSpec.router;
     router.route(request, response).catch(error => {
         writeError(error.message+"\n"+error.stack);
+        /** @type {any} */
         let headers = router.headers;
         headers["Content-Type"] = "text/plain";
         response.writeHead(500, headers);
@@ -110,7 +111,7 @@ server.on("listening", () => {
 });
 
 if(setting.extensions != null) {
-    setting.extensions.forEach(extension => {
+    setting.extensions.forEach((/** @type {string} */extension) => {
         import(Path.resolve(extension)).then(extension => {
             if(extension["extendServer"] != null && typeof extension["extendServer"] == "function") {
                 extension["extendServer"](server);

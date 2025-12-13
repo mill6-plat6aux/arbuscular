@@ -1,6 +1,6 @@
 {
   "name": "arbuscular",
-  "version": "0.9.31",
+  "version": "0.9.32",
   "description": "The ultra-lightweight API server 😋",
   "keywords": [
     "REST",
@@ -16,16 +16,15 @@
   "bin": {
     "arbuscular": "./cli.js"
   },
-  "scripts": {
-    "test": "mocha --exit ./**/*.js"
-  },
   "files": [
     "index.js",
     "cli.js",
     "router.js",
     "validator.js",
     "utility",
-    "index.d.ts"
+    "index.d.ts",
+    "openapi3.1.d.ts",
+    "json-schema.d.ts"
   ],
   "dependencies": {
     "busboy": "^1.6.0",

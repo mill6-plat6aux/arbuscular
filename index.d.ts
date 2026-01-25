@@ -4,8 +4,8 @@
  */
 
 import { IncomingMessage, IncomingHttpHeaders, ServerResponse, Server } from "http";
-import { JsonSchema } from "./json-schema.d.ts";
-import { Components } from "./openapi3.1.d.ts";
+import { JsonSchema } from "./json-schema.d.js";
+import { Components } from "./openapi3.1.d.js";
 
 /**
  * Authentication Function of the REST API
@@ -80,8 +80,8 @@ export class ErrorCode {
     static NotFoundError: string;
 }
 
-export function writeLog(message: string, logLevel?: number, force?: boolean);
-export function writeError(message: string, logLevel?: number, force?: boolean);
+export function writeLog(message: string, logLevel?: number, force?: boolean): void;
+export function writeError(message: string, logLevel?: number, force?: boolean): void;
 
 export class LogLevel {
     static debug: number;
@@ -117,4 +117,4 @@ export class DownloadFile {
     constructor(data: Buffer, dataType: String, fileName: String | null);
 }
 
-export function extendServer(server: Server);
+export function extendServer(server: Server): void;

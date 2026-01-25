@@ -3,7 +3,7 @@
  * Released under the MIT License.
  */
 
-import { JsonSchema } from "./json-schema";
+import { JsonSchema } from "./json-schema.js";
 
 export interface OpenAPI {
     openapi: string;

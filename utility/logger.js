@@ -91,10 +91,23 @@ export function writeLog(message, logLevel, force) {
     if(logLevel == undefined) {
         logLevel = 2;
     }
+    let logLevelLabel;
+    switch(logLevel) {
+        case LogLevel.info:
+            logLevelLabel = 'INFO';
+        case LogLevel.warning:
+            logLevelLabel = 'WARNING';
+        case LogLevel.debug:
+            logLevelLabel = 'DEBUG';
+        case LogLevel.error:
+            logLevelLabel = 'ERROR';
+        case LogLevel.critical:
+            logLevelLabel = 'CRITICAL';
+    }
     if((force == undefined || !force) && logLevel < threshold) {
         return;
     }
-    _writeLog(dateString() + " " + message + "\n");
+    _writeLog(dateString() + " " + logLevelLabel + " " + message + "\n");
 }
 
 /**
@@ -106,10 +119,23 @@ export function writeError(message, logLevel, force) {
     if(logLevel == undefined) {
         logLevel = 4;
     }
+    let logLevelLabel;
+    switch(logLevel) {
+        case LogLevel.error:
+            logLevelLabel = 'ERROR';
+        case LogLevel.warning:
+            logLevelLabel = 'WARNING';
+        case LogLevel.critical:
+            logLevelLabel = 'CRITICAL';
+        case LogLevel.info:
+            logLevelLabel = 'INFO';
+        case LogLevel.debug:
+            logLevelLabel = 'DEBUG';
+    }
     if((force == undefined || !force) && logLevel < threshold) {
         return;
     }
-    _writeError(dateString() + " " + message + "\n");
+    _writeError(dateString() + " " + logLevelLabel + " " + message + "\n");
 }
 
 function dateString() {

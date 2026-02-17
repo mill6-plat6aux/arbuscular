@@ -89,20 +89,20 @@ function loadSetting() {
  */
 export function writeLog(message, logLevel, force) {
     if(logLevel == undefined) {
-        logLevel = 2;
+        logLevel = LogLevel.info;
     }
     let logLevelLabel;
     switch(logLevel) {
         case LogLevel.info:
-            logLevelLabel = 'INFO';
+            logLevelLabel = 'INFO'; break;
         case LogLevel.warning:
-            logLevelLabel = 'WARNING';
+            logLevelLabel = 'WARNING'; break;
         case LogLevel.debug:
-            logLevelLabel = 'DEBUG';
+            logLevelLabel = 'DEBUG'; break;
         case LogLevel.error:
-            logLevelLabel = 'ERROR';
+            logLevelLabel = 'ERROR'; break;
         case LogLevel.critical:
-            logLevelLabel = 'CRITICAL';
+            logLevelLabel = 'CRITICAL'; break;
     }
     if((force == undefined || !force) && logLevel < threshold) {
         return;
@@ -117,20 +117,20 @@ export function writeLog(message, logLevel, force) {
  */
 export function writeError(message, logLevel, force) {
     if(logLevel == undefined) {
-        logLevel = 4;
+        logLevel = LogLevel.error;
     }
     let logLevelLabel;
     switch(logLevel) {
         case LogLevel.error:
-            logLevelLabel = 'ERROR';
+            logLevelLabel = 'ERROR'; break;
         case LogLevel.warning:
-            logLevelLabel = 'WARNING';
+            logLevelLabel = 'WARNING'; break;
         case LogLevel.critical:
-            logLevelLabel = 'CRITICAL';
+            logLevelLabel = 'CRITICAL'; break;
         case LogLevel.info:
-            logLevelLabel = 'INFO';
+            logLevelLabel = 'INFO'; break;
         case LogLevel.debug:
-            logLevelLabel = 'DEBUG';
+            logLevelLabel = 'DEBUG'; break;
     }
     if((force == undefined || !force) && logLevel < threshold) {
         return;

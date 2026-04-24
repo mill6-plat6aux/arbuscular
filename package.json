@@ -1,6 +1,6 @@
 {
   "name": "arbuscular",
-  "version": "0.9.35",
+  "version": "0.9.36",
   "description": "The ultra-lightweight API server 😋",
   "keywords": [
     "REST",

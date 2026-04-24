@@ -315,7 +315,7 @@ export class Router {
             }
         }else if(spec.parameters != null) {
             if(queryParameters != null) {
-                requestBody = {};
+                if(requestBody === undefined) requestBody = {};
                 let result = spec.parameters.every((/** @type {any} */parameterSpec) => {
                     if(parameterSpec.in != "query") {
                         return true;
@@ -347,8 +347,9 @@ export class Router {
                     this.sendError(response, 400, "Request format is not supported.");
                     return;
                 }
-            }else if(pathParameters.length > 0) {
-                requestBody = {};
+            }
+            if(pathParameters.length > 0) {
+                if(requestBody === undefined) requestBody = {};
                 pathParameters.forEach((pathParameter, index) => {
                     if(index < spec.parameters.length && spec.parameters[index].in == "path") {
                         let key = spec.parameters[index].name;
